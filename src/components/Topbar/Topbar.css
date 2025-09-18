@@ -1,0 +1,110 @@
+.topbar {
+  height: 72px;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.topbar-left h1 { 
+  font-size: 24px; 
+  font-weight: 700; 
+  color: var(--text); 
+  margin: 0;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.notifications {
+  position: relative;
+}
+
+.notification-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.notification-btn:hover {
+  background: var(--hover);
+}
+
+.notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ff4444;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-right: 8px;
+}
+
+.user-name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.user-role {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.theme-toggle { 
+  background: var(--primary); 
+  color: var(--on-primary); 
+  border: none; 
+  padding: 8px 12px; 
+  border-radius: 8px; 
+  cursor: pointer; 
+  box-shadow: var(--shadow);
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.theme-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+@media (max-width: 768px) {
+  .topbar {
+    padding: 0 16px;
+  }
+  
+  .user-info {
+    display: none;
+  }
+  
+  .topbar-left h1 {
+    font-size: 20px;
+  }
+}

@@ -1,0 +1,10 @@
+.live-map-page .card { background:#fff; border-radius:12px; padding:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+.live-map-page .map-image { width:100%; border-radius:8px; border:1px solid #e2e8f0; }
+.live-map-page .legend { margin-top:8px; display:flex; flex-direction:column; gap:6px; }
+.live-map-page .legend-item { display:flex; align-items:center; gap:8px; color:#334155; }
+.live-map-page .dot { width:10px; height:10px; border-radius:50%; background:#ef4444; display:inline-block; }
+
+
+
+
+
