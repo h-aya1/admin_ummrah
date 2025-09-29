@@ -1,90 +1,109 @@
-import React, { useState } from "react";
-import { useApp } from "../../contexts/AppContext";
-import toast from "react-hot-toast";
-import "./login.css";
+import { useState } from "react"
+import { useAppContext } from "../../contexts/AppContext"
+import "./login.css"
 
-function Login() {
-  const { login, loading, error } = useApp();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+const Login = () => {
+  const { login } = useAppContext()
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
-  const submit = async (e) => {
-    e.preventDefault();
-    
-    if (!email || !password) {
-      toast.error("Please fill in all fields");
-      return;
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    })
+    setError("")
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError("")
+
+    const result = await login(formData.email, formData.password)
+
+    if (!result.success) {
+      setError(result.error)
     }
 
-    const result = await login({ email, password });
-    
-    if (result.success) {
-      toast.success("Login successful!");
-    } else {
-      toast.error(result.error || "Login failed");
-    }
-  };
+    setLoading(false)
+  }
 
   return (
-    <div className="login-page">
+    <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          <h2>Umrah Admin Login</h2>
-          <p className="muted">Access the Umrah Guide Admin Dashboard</p>
-        </div>
-        
-        {error && (
-          <div className="error-message">
-            {error}
+          <div className="logo">
+            <span className="logo-icon">🕋</span>
+            <h1>Umrah Admin</h1>
           </div>
-        )}
-        
-        <form onSubmit={submit}>
+          <p className="login-subtitle">Sign in to your admin dashboard</p>
+        </div>
+
+        <form className="login-form" onSubmit={handleSubmit}>
+          {error && (
+            <div className="error-message">
+              <span className="error-icon">⚠️</span>
+              {error}
+            </div>
+          )}
+
           <div className="form-group">
             <label htmlFor="email">Email Address</label>
-            <input 
+            <input
+              type="email"
               id="email"
-              type="email" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              placeholder="admin@example.com"
-              disabled={loading}
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              className="input"
+              placeholder="admin@umrah.com"
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input 
+            <input
+              type="password"
               id="password"
-              type="password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              placeholder="••••••••"
-              disabled={loading}
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              className="input"
+              placeholder="Enter your password"
               required
             />
           </div>
-          
-          <button 
-            className="btn primary" 
-            type="submit"
-            disabled={loading}
-          >
-            {loading ? "Signing in..." : "Sign in"}
+
+          <button type="submit" className="login-btn" disabled={loading}>
+            {loading ? (
+              <>
+                <div className="loading-spinner small"></div>
+                Signing in...
+              </>
+            ) : (
+              "Sign In"
+            )}
           </button>
-          
-          <div className="demo-info">
-            <p className="muted">Demo Credentials:</p>
-            <p className="muted">Email: admin@demo.com</p>
-            <p className="muted">Password: admin123</p>
-          </div>
         </form>
+
+        <div className="login-footer">
+          <p className="demo-credentials">
+            <strong>Demo Credentials:</strong>
+            <br />
+            Email: admin@umrah.com
+            <br />
+            Password: admin123
+          </p>
+        </div>
       </div>
     </div>
-  );
+  )
 }
 
-export default Login;
-
-
+export default Login

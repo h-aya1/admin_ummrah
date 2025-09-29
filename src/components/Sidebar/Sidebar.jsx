@@ -1,63 +1,160 @@
-import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { useApp } from "../../contexts/AppContext";
-import "./Sidebar.css";
+"use client"
+import { useState, useEffect } from "react"
+import { Link, useLocation } from "react-router-dom"
+import { useAppContext } from "../../contexts/AppContext"
+import "./Sidebar.css"
 
-function Sidebar() {
-  const [open, setOpen] = useState(true);
-  const location = useLocation();
-  const { logout } = useApp();
+const Sidebar = () => {
+  const { sidebarCollapsed, toggleSidebar } = useAppContext()
+  const location = useLocation()
+  const [isMobile, setIsMobile] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
-  const items = [
-    { to: "/dashboard", label: "Dashboard", icon: "🏠" },
-    { to: "/dua", label: "Duas", icon: "📜" },
-    { to: "/umrah-guides", label: "Guides", icon: "📘" },
-    { to: "/visit-places", label: "Places", icon: "📍" },
-    { to: "/manage-groups", label: "Groups", icon: "👥" },
-    { to: "/live-map", label: "Live Map", icon: "🗺️" },
-    { to: "/chat", label: "Chat", icon: "💬" },
-    { to: "/notifications", label: "Notifications", icon: "🔔" },
-    { to: "/settings", label: "Settings", icon: "⚙️" },
-  ];
-
-  const handleLogout = () => {
-    if (window.confirm("Are you sure you want to logout?")) {
-      logout();
+  // Check if device is mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768)
     }
-  };
+
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+
+    // Listen for mobile menu toggle from topbar
+    const handleMobileMenuToggle = () => {
+      if (isMobile) {
+        setMobileOpen(!mobileOpen)
+      }
+    }
+
+    window.addEventListener('mobileMenuToggle', handleMobileMenuToggle)
+
+    return () => {
+      window.removeEventListener('resize', checkMobile)
+      window.removeEventListener('mobileMenuToggle', handleMobileMenuToggle)
+    }
+  }, [isMobile, mobileOpen])
+
+  const handleToggle = () => {
+    if (isMobile) {
+      setMobileOpen(!mobileOpen)
+    } else {
+      toggleSidebar()
+    }
+  }
+
+  const handleNavClick = () => {
+    // Close mobile sidebar when navigation item is clicked
+    if (isMobile && mobileOpen) {
+      setMobileOpen(false)
+    }
+  }
+
+  const menuItems = [
+    {
+      path: "/dashboard",
+      icon: "📊",
+      label: "Dashboard",
+      description: "Overview & Analytics",
+    },
+    {
+      path: "/manage-groups",
+      icon: "👥",
+      label: "Manage Groups",
+      description: "Pilgrim Groups",
+    },
+    {
+      path: "/live-map",
+      icon: "🗺️",
+      label: "Live Map",
+      description: "Location Tracking",
+    },
+    {
+      path: "/chat",
+      icon: "💬",
+      label: "Chat Monitor",
+      description: "Group Communications",
+    },
+    {
+      path: "/dua",
+      icon: "🤲",
+      label: "Duas",
+      description: "Prayer Management",
+    },
+    {
+      path: "/umrah-guides",
+      icon: "📖",
+      label: "Umrah Guides",
+      description: "Step-by-Step Guides",
+    },
+    {
+      path: "/visit-places",
+      icon: "🕌",
+      label: "Visit Places",
+      description: "Sacred Locations",
+    },
+    {
+      path: "/notifications",
+      icon: "🔔",
+      label: "Notifications",
+      description: "Alerts & Messages",
+    },
+  ]
 
   return (
-    <div className={`sidebar ${open ? "open" : "closed"}`}>
-      <div className="sidebar-header">
-        <button className="toggle-btn" onClick={() => setOpen(!open)}>
-          ☰
-        </button>
-        {open && <h3>Umrah Admin</h3>}
-      </div>
-      <nav>
-        <ul>
-          {items.map((it) => (
-            <li key={it.to}>
-              <Link 
-                className={location.pathname === it.to ? "active" : ""} 
-                to={it.to}
-                title={it.label}
-              >
-                <span className="icon" aria-hidden>{it.icon}</span>
-                {open && <span className="label">{it.label}</span>}
-              </Link>
-            </li>
-          ))}
-        </ul>
+    <>
+      {isMobile && mobileOpen && (
+        <div
+          className="mobile-overlay active"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+      <div className={`sidebar ${sidebarCollapsed && !isMobile ? "collapsed" : ""} ${mobileOpen ? "mobile-open" : ""}`}>
+        <div className="sidebar-header">
+          <div className="logo">
+            <span className="logo-icon">🕋</span>
+            {(!sidebarCollapsed || isMobile) && (
+              <div className="logo-text">
+                <h2>Umrah Admin</h2>
+                <p>Management Portal</p>
+              </div>
+            )}
+          </div>
+          <button className="toggle-btn" onClick={handleToggle}>
+            {isMobile ? (mobileOpen ? '✕' : '☰') : (sidebarCollapsed ? "→" : "←")}
+          </button>
+        </div>
+
+      <nav className="sidebar-nav">
+        {menuItems.map((item) => (
+          <Link
+            key={item.path}
+            to={item.path}
+            className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
+            title={sidebarCollapsed ? item.label : ""}
+            onClick={handleNavClick}
+          >
+            <span className="nav-icon">{item.icon}</span>
+            {!sidebarCollapsed && (
+              <div className="nav-content">
+                <span className="nav-label">{item.label}</span>
+                <span className="nav-description">{item.description}</span>
+              </div>
+            )}
+          </Link>
+        ))}
       </nav>
+
       <div className="sidebar-footer">
-        <button className="logout-btn" onClick={handleLogout} title="Logout">
-          <span className="icon">🚪</span>
-          {open && <span className="label">Logout</span>}
-        </button>
+        {!sidebarCollapsed && !isMobile && (
+          <div className="footer-content">
+            <p className="footer-text">Umrah Guide Admin v1.0</p>
+            <p className="footer-subtext">Spiritual Travel Management</p>
+          </div>
+        )}
       </div>
     </div>
-  );
+    </>
+  )
 }
 
-export default Sidebar;
+export default Sidebar
