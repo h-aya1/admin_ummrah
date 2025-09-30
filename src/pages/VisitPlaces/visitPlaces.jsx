@@ -22,36 +22,39 @@ const VisitPlaces = () => {
       {
         id: 1,
         name: "Masjid al-Haram",
-        description: "The holiest mosque in Islam, surrounding the Kaaba",
+        description: {
+          english: "The holiest mosque in Islam, surrounding the Kaaba",
+          amharic: "በእስላም ሃይማኖት የሆነ ተቀዳሚ መስጊድ፣ ካዕባን ከተለወጠበት",
+          oromo: "Masjiid al-Haram, ka'abaa naannoo keessa jiru, islaama keessatti kan qubata"
+        },
         city: "makkah",
         mapLocation: "https://maps.google.com/?q=21.4225,39.8262",
-        significance: "The most sacred site in Islam where Muslims perform Hajj and Umrah",
-        visitingHours: "24/7",
-        tips: "Arrive early for prayers, dress modestly, be respectful of other pilgrims",
         images: ["/masjid-al-haram.jpg"],
         createdAt: "2024-01-15",
       },
       {
         id: 2,
         name: "Masjid an-Nabawi",
-        description: "The Prophet's Mosque in Medina",
+        description: {
+          english: "The Prophet's Mosque in Medina",
+          amharic: "በመዲና ሆነው የነቢዩ መስጊድ",
+          oromo: "Masjiid an-Nabawi, magaalaa Madinaa keessatti argamu"
+        },
         city: "medina",
         mapLocation: "https://maps.google.com/?q=24.4672,39.6117",
-        significance: "The second holiest mosque in Islam, burial place of Prophet Muhammad",
-        visitingHours: "24/7",
-        tips: "Visit the Rawdah area, pay respects at the Prophet's grave",
         images: ["/masjid-an-nabawi.jpg"],    
         createdAt: "2024-01-10",
       },
       {
         id: 3,
         name: "Mount Arafat",
-        description: "The hill where Prophet Muhammad delivered his farewell sermon",
+        description: {
+          english: "The hill where Prophet Muhammad delivered his farewell sermon",
+          amharic: "ነቢዩ ሙሃመድ የራሱን የተለያዩ ማብራሪያ ያቀረባበት ኮሌ",
+          oromo: "Duka'a Arafat, nabiyyi Muhammad (s.w.t.) yaad-annoo jalqabaa isaaniif dubbate"
+        },
         city: "makkah",
         mapLocation: "https://maps.google.com/?q=21.3544,39.9857",
-        significance: "Essential part of Hajj pilgrimage, site of standing (Wuquf)",
-        visitingHours: "Daylight hours",
-        tips: "Bring water and sun protection, best visited during Hajj season",
         images: ["/mount-arafat.jpg"],
         createdAt: "2024-01-08",
       },
@@ -136,27 +139,20 @@ const VisitPlaces = () => {
                 </div>
               </div>
 
-              <p className="place-description">{place.description}</p>
+              <div className="place-description">
+                <h4>Description</h4>
+                <div className="description-translations">
+                  <p><strong>English:</strong> {place.description.english}</p>
+                  <p><strong>Amharic:</strong> {place.description.amharic}</p>
+                  <p><strong>Oromo:</strong> {place.description.oromo}</p>
+                </div>
+              </div>
 
               <div className="place-meta">
                 <div className="meta-item">
                   <span className="meta-icon">📍</span>
                   <span className="meta-text">{place.city.charAt(0).toUpperCase() + place.city.slice(1)}</span>
                 </div>
-                <div className="meta-item">
-                  <span className="meta-icon">🕐</span>
-                  <span className="meta-text">{place.visitingHours}</span>
-                </div>
-              </div>
-
-              <div className="place-significance">
-                <h4>Significance</h4>
-                <p>{place.significance}</p>
-              </div>
-
-              <div className="place-tips">
-                <h4>Visiting Tips</h4>
-                <p>{place.tips}</p>
               </div>
 
               <div className="place-footer">
@@ -201,11 +197,12 @@ const VisitPlaces = () => {
 const PlaceModal = ({ place, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: place?.name || "",
-    description: place?.description || "",
+    description: {
+      english: place?.description?.english || "",
+      amharic: place?.description?.amharic || "",
+      oromo: place?.description?.oromo || "",
+    },
     city: place?.city || "makkah",
-    significance: place?.significance || "",
-    visitingHours: place?.visitingHours || "",
-    tips: place?.tips || "",
     mapLocation: place?.mapLocation || "",
     images: place?.images || [],
   })
@@ -215,6 +212,15 @@ const PlaceModal = ({ place, onClose, onSave }) => {
     if (name === "images" && files && files[0]) {
       const newImages = [...formData.images, URL.createObjectURL(files[0])]
       setFormData({ ...formData, images: newImages })
+    } else if (name.startsWith("description.")) {
+      const lang = name.split(".")[1]
+      setFormData({
+        ...formData,
+        description: {
+          ...formData.description,
+          [lang]: value
+        }
+      })
     } else {
       setFormData({ ...formData, [name]: value })
     }
@@ -249,10 +255,34 @@ const PlaceModal = ({ place, onClose, onSave }) => {
           </div>
 
           <div className="form-group">
-            <label>Description</label>
+            <label>Description (English)</label>
             <textarea
-              name="description"
-              value={formData.description}
+              name="description.english"
+              value={formData.description.english}
+              onChange={handleChange}
+              className="input"
+              rows="3"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Description (Amharic)</label>
+            <textarea
+              name="description.amharic"
+              value={formData.description.amharic}
+              onChange={handleChange}
+              className="input"
+              rows="3"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Description (Oromo)</label>
+            <textarea
+              name="description.oromo"
+              value={formData.description.oromo}
               onChange={handleChange}
               className="input"
               rows="3"
@@ -274,34 +304,6 @@ const PlaceModal = ({ place, onClose, onSave }) => {
     
           </div>
 
-          <div className="form-group">
-            <label>Significance</label>
-            <textarea
-              name="significance"
-              value={formData.significance}
-              onChange={handleChange}
-              className="input"
-              rows="3"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Visiting Hours</label>
-            <input
-              type="text"
-              name="visitingHours"
-              value={formData.visitingHours}
-              onChange={handleChange}
-              className="input"
-              placeholder="e.g., 24/7 or 9:00 AM - 6:00 PM"
-
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Visiting Tips</label>
-            <textarea name="tips" value={formData.tips} onChange={handleChange} className="input" rows="3" required />
-          </div>
 
           <div className="form-group">
             <label>Images</label>
