@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react"
+import { authAPI, usersAPI } from "../services/api"
 
 const AppContext = createContext()
 
@@ -34,22 +35,25 @@ export const AppProvider = ({ children }) => {
   const [groups, setGroups] = useState([])
   const [messages, setMessages] = useState([])
 
-  // Load data from localStorage on app start
+  // Load data from API when authenticated
   useEffect(() => {
-    const storedUsers = localStorage.getItem("ummrah_users")
-    const storedGroups = localStorage.getItem("ummrah_groups")
-    const storedMessages = localStorage.getItem("ummrah_messages")
-
-    if (storedUsers) {
-      setUsers(JSON.parse(storedUsers))
-    }
-    if (storedGroups) {
-      setGroups(JSON.parse(storedGroups))
-    }
-    if (storedMessages) {
-      setMessages(JSON.parse(storedMessages))
-    }
-  }, [])
+    const loadData = async () => {
+      if (isAuthenticated) {
+        try {
+          const usersResponse = await usersAPI.getAll();
+          setUsers(usersResponse);
+          // TODO: Load groups and messages from API
+        } catch (error) {
+          console.error('Failed to load data:', error);
+          // If unauthorized, logout the user
+          if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+            logout();
+          }
+        }
+      }
+    };
+    loadData();
+  }, [isAuthenticated]);
 
   // Update stats whenever users, groups, or messages change
   useEffect(() => {
@@ -67,26 +71,26 @@ export const AppProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      // Simulate API call
-      if (email === "admin@umrah.com" && password === "admin123") {
-        const userData = {
-          id: 1,
-          name: "Admin User",
-          email: "admin@umrah.com",
-          role: "admin",
-        }
+      const response = await authAPI.loginAdmin(email, password);
+      const { access_token } = response;
 
-        localStorage.setItem("adminToken", "mock-jwt-token")
-        localStorage.setItem("adminUser", JSON.stringify(userData))
+      // Decode token to get user info (simple decode, in production use a library)
+      const payload = JSON.parse(atob(access_token.split('.')[1]));
+      const userData = {
+        id: payload.sub,
+        name: payload.username || email,
+        email: payload.username || email,
+        role: payload.role,
+      };
 
-        setIsAuthenticated(true)
-        setUser(userData)
-        return { success: true }
-      } else {
-        return { success: false, error: "Invalid credentials" }
-      }
+      localStorage.setItem("adminToken", access_token);
+      localStorage.setItem("adminUser", JSON.stringify(userData));
+
+      setIsAuthenticated(true);
+      setUser(userData);
+      return { success: true };
     } catch (error) {
-      return { success: false, error: "Login failed" }
+      return { success: false, error: error.message || "Login failed" };
     }
   }
 
@@ -128,24 +132,29 @@ export const AppProvider = ({ children }) => {
   }
 
   // User management functions
-  const addUser = (userData) => {
-    const newUser = {
-      ...userData,
-      id: Date.now(),
-      joinedAt: new Date().toISOString().split("T")[0],
-      password: Math.random().toString(36).slice(-8),
+  const addUser = async (userData) => {
+    try {
+      const response = await authAPI.registerUser(userData);
+      // Response includes generated password
+      const newUser = {
+        ...response,
+        password: response.password, // Generated password
+      };
+      // For now, still add to local state for UI, but ideally fetch from API
+      const updatedUsers = [...users, newUser];
+      setUsers(updatedUsers);
+      // localStorage.setItem("ummrah_users", JSON.stringify(updatedUsers)); // Remove since using API
+
+      addActivity({
+        type: "user_added",
+        message: `Admin added new user: ${newUser.name}`,
+        icon: "👤",
+      });
+
+      return newUser;
+    } catch (error) {
+      throw new Error(error.message || "Failed to add user");
     }
-    const updatedUsers = [...users, newUser]
-    setUsers(updatedUsers)
-    localStorage.setItem("ummrah_users", JSON.stringify(updatedUsers))
-
-    addActivity({
-      type: "user_added",
-      message: `Admin added new user: ${newUser.name}`,
-      icon: "👤",
-    })
-
-    return newUser
   }
 
   const updateUser = (userId, userData) => {

@@ -1,14 +1,50 @@
-// Minimal mock API layer to unblock UI. Replace with real HTTP later.
+// API service with authentication
+const API_BASE_URL = 'http://localhost:3000'; // Adjust if needed
 
-const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+// Helper to get auth headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('adminToken');
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
+
+// Helper for API calls
+const apiCall = async (endpoint, options = {}) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    ...getAuthHeaders(),
+    ...options.headers,
+  };
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Network error' }));
+    throw new Error(error.message || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+};
+
+export const authAPI = {
+  async loginAdmin(email, password) {
+    return apiCall('/auth/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  },
+
+  async registerUser(userData) {
+    return apiCall('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  },
+};
 
 export const usersAPI = {
   async getAll() {
-    await delay(300);
-    return { data: [
-      { id: 'u1', name: 'Ahmed Ali', email: 'ahmed@example.com', role: 'Pilgrim', status: 'active', group: { id: 'g1', name: 'Group A' } },
-      { id: 'u2', name: 'Sara Khan', email: 'sara@example.com', role: 'Pilgrim', status: 'active', group: { id: 'g1', name: 'Group A' } },
-    ] };
+    return apiCall('/admin/users');
   },
 };
 

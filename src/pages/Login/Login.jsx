@@ -61,7 +61,7 @@ const Login = () => {
               value={formData.email}
               onChange={handleChange}
               className="input"
-              placeholder="admin@umrah.com"
+              placeholder="Enter your email"
               required
             />
           </div>
@@ -91,16 +91,6 @@ const Login = () => {
             )}
           </button>
         </form>
-
-        <div className="login-footer">
-          <p className="demo-credentials">
-            <strong>Demo Credentials:</strong>
-            <br />
-            Email: admin@umrah.com
-            <br />
-            Password: admin123
-          </p>
-        </div>
       </div>
     </div>
   )

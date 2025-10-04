@@ -63,23 +63,15 @@ const AppContent = () => {
 function App() {
   const { isAuthenticated } = useAppContext()
 
-  if (!isAuthenticated) {
-    return (
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </Router>
-    )
-  }
-
   return (
-    <ThemeProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </ThemeProvider>
+    <Router>
+      <ThemeProvider>
+        <Routes>
+          <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+          <Route path="/*" element={isAuthenticated ? <AppContent /> : <Navigate to="/login" replace />} />
+        </Routes>
+      </ThemeProvider>
+    </Router>
   )
 }
 
