@@ -1,5 +1,68 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react"
-import { authAPI, usersAPI } from "../services/api"
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { authAPI, usersAPI, groupsAPI } from "../services/api"
+
+const generateRandomPassword = (length = 10) => {
+  const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@$!%*?&"
+  let password = ""
+  for (let i = 0; i < length; i += 1) {
+    const index = Math.floor(Math.random() * charset.length)
+    password += charset[index]
+  }
+  return password
+}
+
+const PASSWORD_STORE_KEY = "adminUserPasswords"
+
+const ensureAmirMember = (group, usersList = []) => {
+  if (!group) return group
+  const members = Array.isArray(group.members) ? [...group.members] : []
+  const amirId = group?.amirId != null ? String(group.amirId) : null
+  const amirName = typeof group?.amir === "string" ? group.amir : ""
+
+  const hasAmir = members.some((member) => {
+    const memberId = member?.id != null ? String(member.id) : null
+    return (
+      (amirId && memberId === amirId) ||
+      (amirName && member?.name === amirName) ||
+      member?.role === "amir"
+    )
+  })
+
+  if (hasAmir) {
+    return {
+      ...group,
+      members,
+      totalMembers: group.totalMembers ?? members.length,
+    }
+  }
+
+  const amirUser = usersList.find((user) => {
+    const userId = user?.id != null ? String(user.id) : null
+    return (
+      (amirId && userId === amirId) ||
+      (amirName && user?.name === amirName)
+    )
+  })
+
+  const amirMember = {
+    id: amirUser?.id ?? amirId ?? `amir-${group.id}`,
+    name: amirUser?.name ?? amirName ?? "Group Amir",
+    phone: amirUser?.phone ?? "",
+    role: "amir",
+    joinedAt: amirUser?.joinedAt || new Date().toISOString().split("T")[0],
+  }
+
+  const updatedMembers = [amirMember, ...members]
+
+  return {
+    ...group,
+    members: updatedMembers,
+    totalMembers: Math.max(updatedMembers.length, group.totalMembers ?? 0),
+  }
+}
+
+const normalizeGroupsWithAmir = (groupsList = [], usersList = []) =>
+  groupsList.map((group) => ensureAmirMember(group, usersList))
 
 const AppContext = createContext()
 
@@ -31,18 +94,37 @@ export const AppProvider = ({ children }) => {
   })
   const [recentActivities, setRecentActivities] = useState([])
   const [currentPage, setCurrentPage] = useState("Dashboard")
+  const [userPasswords, setUserPasswords] = useState(() => {
+    try {
+      const stored = localStorage.getItem(PASSWORD_STORE_KEY)
+      return stored ? JSON.parse(stored) : {}
+    } catch (error) {
+      console.warn("Failed to parse stored user passwords", error)
+      return {}
+    }
+  })
   const [users, setUsers] = useState([])
   const [groups, setGroups] = useState([])
   const [messages, setMessages] = useState([])
+  const usersRef = useRef([])
 
   // Load data from API when authenticated
   useEffect(() => {
     const loadData = async () => {
       if (isAuthenticated) {
         try {
-          const usersResponse = await usersAPI.getAll();
-          setUsers(usersResponse);
-          // TODO: Load groups and messages from API
+          const [usersResponse, groupsResponse] = await Promise.all([
+            usersAPI.getAll(),
+            groupsAPI.getAll(),
+          ]);
+          const usersWithPasswords = usersResponse.map((user) => (
+            userPasswords?.[user.id]
+              ? { ...user, password: userPasswords[user.id] }
+              : user
+          ));
+          setUsers(usersWithPasswords);
+          usersRef.current = usersWithPasswords;
+          setGroups(normalizeGroupsWithAmir(groupsResponse, usersWithPasswords));
         } catch (error) {
           console.error('Failed to load data:', error);
           // If unauthorized, logout the user
@@ -72,18 +154,26 @@ export const AppProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await authAPI.loginAdmin(email, password);
-      const { access_token } = response;
+      const token = response?.access_token || response?.accessToken || response?.token;
+      if (!token) {
+        throw new Error("Invalid login response: missing access token");
+      }
 
-      // Decode token to get user info (simple decode, in production use a library)
-      const payload = JSON.parse(atob(access_token.split('.')[1]));
-      const userData = {
-        id: payload.sub,
-        name: payload.username || email,
-        email: payload.username || email,
-        role: payload.role,
-      };
+      // Decode token to get user info (best-effort; if it fails, still log in)
+      let userData = { id: undefined, name: email, email, role: undefined };
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        userData = {
+          id: payload?.sub || payload?.id,
+          name: payload?.username || payload?.name || email,
+          email: payload?.username || payload?.email || email,
+          role: payload?.role,
+        };
+      } catch {
+        // ignore decode errors
+      }
 
-      localStorage.setItem("adminToken", access_token);
+      localStorage.setItem("adminToken", token);
       localStorage.setItem("adminUser", JSON.stringify(userData));
 
       setIsAuthenticated(true);
@@ -131,146 +221,302 @@ export const AppProvider = ({ children }) => {
     setCurrentPage(page)
   }
 
+  // Fetch helpers
+  const applyStoredPasswords = useCallback((list, passwords = userPasswords) =>
+    list.map((user) => {
+      const storedPassword = passwords?.[user.id]
+      return storedPassword ? { ...user, password: storedPassword } : user
+    }),
+    [userPasswords]
+  )
+
+  const persistUserPasswords = useCallback((updater) => {
+    setUserPasswords((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater
+      try {
+        localStorage.setItem(PASSWORD_STORE_KEY, JSON.stringify(next))
+      } catch (error) {
+        console.warn("Failed to persist user passwords", error)
+      }
+      return next
+    })
+  }, [])
+
+  const refreshUsers = useCallback(async () => {
+    try {
+      const data = await usersAPI.getAll();
+      const merged = applyStoredPasswords(data);
+      setUsers(merged);
+      return merged;
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch users");
+    }
+  }, [applyStoredPasswords]);
+
+  const refreshGroups = useCallback(async (usersOverride) => {
+    try {
+      const data = await groupsAPI.getAll();
+      const normalized = normalizeGroupsWithAmir(data, usersOverride ?? usersRef.current);
+      setGroups(normalized);
+      return normalized;
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch groups");
+    }
+  }, []);
+
+  useEffect(() => {
+    usersRef.current = users;
+  }, [users])
+
   // User management functions
   const addUser = async (userData) => {
     try {
-      const response = await authAPI.registerUser(userData);
-      // Response includes generated password
-      const newUser = {
-        ...response,
-        password: response.password, // Generated password
+      const password = (userData?.password || "").trim() || generateRandomPassword()
+      // sanitize create payload: include only supported, non-empty fields
+      const payload = {
+        name: userData?.name?.trim(),
+        email: userData?.email?.trim(),
+        phone: userData?.phone?.trim(),
+        role: userData?.role || "member",
+        emergencyContact: userData?.emergencyContact?.trim(),
+        password,
       };
-      // For now, still add to local state for UI, but ideally fetch from API
-      const updatedUsers = [...users, newUser];
-      setUsers(updatedUsers);
-      // localStorage.setItem("ummrah_users", JSON.stringify(updatedUsers)); // Remove since using API
-
-      addActivity({
-        type: "user_added",
-        message: `Admin added new user: ${newUser.name}`,
-        icon: "👤",
+      // remove empty strings / undefined / null entries
+      Object.keys(payload).forEach((k) => {
+        if (payload[k] === "" || payload[k] === undefined || payload[k] === null) {
+          delete payload[k];
+        }
       });
 
-      return newUser;
+      const created = await usersAPI.create(payload);
+      const createdWithPassword = {
+        ...created,
+        password: created?.password || password,
+      }
+      setUsers((prev) => [...prev, createdWithPassword]);
+      persistUserPasswords((prev) => ({
+        ...prev,
+        [createdWithPassword.id]: createdWithPassword.password,
+      }))
+      await refreshGroups().catch(() => {});
+      addActivity({
+        type: "user_added",
+        message: `Admin added new user: ${createdWithPassword.name}`,
+        icon: "👤",
+      });
+      return createdWithPassword;
     } catch (error) {
       throw new Error(error.message || "Failed to add user");
     }
   }
 
-  const updateUser = (userId, userData) => {
-    const updatedUsers = users.map(user =>
-      user.id === userId ? { ...user, ...userData } : user
-    )
-    setUsers(updatedUsers)
-    localStorage.setItem("ummrah_users", JSON.stringify(updatedUsers))
-
-    const updatedUser = updatedUsers.find(user => user.id === userId)
-    addActivity({
-      type: "user_updated",
-      message: `Admin updated user: ${updatedUser.name}`,
-      icon: "✏️",
-    })
+  const updateUser = async (userId, userData) => {
+    try {
+      const updated = await usersAPI.update(userId, userData);
+      const nextPassword = (userData?.password || "").trim();
+      if (nextPassword) {
+        persistUserPasswords((prev) => ({ ...prev, [userId]: nextPassword }))
+      }
+      const storedPassword = userPasswords?.[userId] || nextPassword;
+      const mergedUser = storedPassword ? { ...updated, password: storedPassword } : updated;
+      setUsers((prev) => prev.map((u) => (u.id === userId ? mergedUser : u)));
+      await refreshGroups().catch(() => {});
+      addActivity({
+        type: "user_updated",
+        message: `Admin updated user: ${updated.name}`,
+        icon: "✏️",
+      })
+      return updated;
+    } catch (error) {
+      throw new Error(error.message || "Failed to update user");
+    }
   }
 
-  const deleteUser = (userId) => {
-    const userToDelete = users.find(user => user.id === userId)
-    const updatedUsers = users.filter(user => user.id !== userId)
-    setUsers(updatedUsers)
-    localStorage.setItem("ummrah_users", JSON.stringify(updatedUsers))
-
-    // Also remove user from any groups
-    const updatedGroups = groups.map(group => ({
-      ...group,
-      members: Array.isArray(group.members)
-        ? group.members.filter(member => member.id !== userId)
-        : [],
-      totalMembers: Array.isArray(group.members)
-        ? group.members.filter(member => member.id !== userId).length
-        : 0,
-    }))
-    setGroups(updatedGroups)
-    localStorage.setItem("ummrah_groups", JSON.stringify(updatedGroups))
-
-    addActivity({
-      type: "user_deleted",
-      message: `Admin deleted user: ${userToDelete.name}`,
-      icon: "🗑️",
-    })
+  const deleteUser = async (userId) => {
+    try {
+      const userToDelete = users.find((u) => u.id === userId);
+      await usersAPI.delete(userId);
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      persistUserPasswords((prev) => {
+        const next = { ...prev }
+        delete next[userId]
+        return next
+      })
+      // Refresh groups to reflect membership changes server-side
+      await refreshGroups().catch(() => {});
+      addActivity({
+        type: "user_deleted",
+        message: `Admin deleted user: ${userToDelete?.name || userId}`,
+        icon: "🗑️",
+      })
+      return true;
+    } catch (error) {
+      throw new Error(error.message || "Failed to delete user");
+    }
   }
 
   // Group management functions
-  const addGroup = (groupData) => {
-    const amirUser = users.find(u => u.name === groupData.amir)
-    const amirMember = amirUser ? {
-      id: amirUser.id,
-      name: amirUser.name,
-      phone: amirUser.phone,
-      role: "amir",
-      joinedAt: new Date().toISOString().split("T")[0]
-    } : null
+  const addGroup = async (groupData) => {
+    try {
+      const amirUser = users.find((u) => u.name === groupData.amir);
+      const amirMember = amirUser
+        ? {
+            id: amirUser.id,
+            name: amirUser.name,
+            phone: amirUser.phone,
+            role: "amir",
+            joinedAt: new Date().toISOString().split("T")[0],
+          }
+        : null;
 
-    const newGroup = {
-      ...groupData,
-      id: Date.now(),
-      createdAt: new Date().toISOString().split("T")[0],
-      members: amirMember ? [amirMember] : [],
-      totalMembers: amirMember ? 1 : 0,
-      activeMembers: 0,
-      location: groupData.location || "Not set",
-      lastActivity: new Date().toISOString()
+      const payload = {
+        ...groupData,
+        createdAt: new Date().toISOString().split("T")[0],
+        members: amirMember ? [amirMember] : [],
+        totalMembers: amirMember ? 1 : 0,
+        activeMembers: 0,
+        location: groupData.location || "Not set",
+        lastActivity: new Date().toISOString(),
+      };
+
+      const created = await groupsAPI.create(payload);
+      const normalizedCreated = ensureAmirMember(created, users);
+      setGroups((prev) => [...prev, normalizedCreated]);
+
+      // Update the amir user's group assignment
+      if (amirUser) {
+        try {
+          const updatedAmir = await usersAPI.update(amirUser.id, {
+            groupId: created.id,
+            groupName: created.name,
+          });
+          setUsers((prev) => prev.map((u) => (u.id === updatedAmir.id ? updatedAmir : u)));
+        } catch (e) {
+          console.error("Failed to update amir user's group assignment:", e);
+          await refreshUsers().catch(() => {});
+        }
+      }
+
+      addActivity({
+        type: "group_created",
+        message: `Admin created new group: ${created.name}`,
+        icon: "🏕️",
+      })
+
+      return created;
+    } catch (error) {
+      throw new Error(error.message || "Failed to add group");
     }
-
-    const updatedGroups = [...groups, newGroup]
-    setGroups(updatedGroups)
-    localStorage.setItem("ummrah_groups", JSON.stringify(updatedGroups))
-
-    // Update the amir user's group assignment
-    if (amirUser) {
-      updateUser(amirUser.id, { groupId: newGroup.id, groupName: newGroup.name })
-    }
-
-    addActivity({
-      type: "group_created",
-      message: `Admin created new group: ${newGroup.name}`,
-      icon: "🏕️",
-    })
-
-    return newGroup
   }
 
-  const updateGroup = (groupId, groupData) => {
-    const updatedGroups = groups.map(group =>
-      group.id === groupId ? { ...group, ...groupData, lastActivity: new Date().toISOString() } : group
-    )
-    setGroups(updatedGroups)
-    localStorage.setItem("ummrah_groups", JSON.stringify(updatedGroups))
-
-    const updatedGroup = updatedGroups.find(group => group.id === groupId)
-    addActivity({
-      type: "group_updated",
-      message: `Admin updated group: ${updatedGroup.name}`,
-      icon: "✏️",
-    })
+  const updateGroup = async (groupId, groupData) => {
+    try {
+      const payload = { ...groupData, lastActivity: new Date().toISOString() };
+      const updated = await groupsAPI.update(groupId, payload);
+      const normalized = ensureAmirMember(updated, users);
+      setGroups((prev) => prev.map((g) => (g.id === groupId ? normalized : g)));
+      addActivity({
+        type: "group_updated",
+        message: `Admin updated group: ${normalized.name}`,
+        icon: "✏️",
+      })
+      return normalized;
+    } catch (error) {
+      throw new Error(error.message || "Failed to update group");
+    }
   }
 
-  const deleteGroup = (groupId) => {
-    const groupToDelete = groups.find(group => group.id === groupId)
-    const updatedGroups = groups.filter(group => group.id !== groupId)
-    setGroups(updatedGroups)
-    localStorage.setItem("ummrah_groups", JSON.stringify(updatedGroups))
+  const deleteGroup = async (groupId) => {
+    try {
+      const groupToDelete = groups.find((g) => g.id === groupId);
+      await groupsAPI.delete(groupId);
+      setGroups((prev) => prev.filter((g) => g.id !== groupId));
+      // Refresh users to reflect removed assignments
+      await refreshUsers().catch(() => {});
+      addActivity({
+        type: "group_deleted",
+        message: `Admin deleted group: ${groupToDelete?.name || groupId}`,
+        icon: "🗑️",
+      })
+      return true;
+    } catch (error) {
+      throw new Error(error.message || "Failed to delete group");
+    }
+  }
 
-    // Remove group assignments from users
-    const updatedUsers = users.map(user =>
-      user.groupId === groupId ? { ...user, groupId: null, groupName: null } : user
-    )
-    setUsers(updatedUsers)
-    localStorage.setItem("ummrah_users", JSON.stringify(updatedUsers))
+  // Membership management (safer flow): update user assignment, then refresh groups
+  const assignUserToGroup = async (userId, groupId) => {
+    try {
+      const group = groups.find((g) => g.id === groupId);
+      const userObj = users.find((u) => u.id === userId);
+      if (!group || !userObj) {
+        throw new Error("User or group not found");
+      }
 
-    addActivity({
-      type: "group_deleted",
-      message: `Admin deleted group: ${groupToDelete.name}`,
-      icon: "🗑️",
-    })
+      // Update only the user assignment
+      const updatedUser = await usersAPI.update(userId, { groupId, groupName: group.name });
+      const userWithGroup = {
+        ...userObj,
+        ...updatedUser,
+        groupId: updatedUser?.groupId ?? groupId,
+        groupName: updatedUser?.groupName ?? group.name,
+        password: userObj.password || userPasswords?.[userId],
+      }
+      const optimisticUsers = users.map((u) => (u.id === userId ? userWithGroup : u));
+      setUsers(optimisticUsers);
+
+      // Re-fetch groups to reflect server-side membership computation
+      const refreshedGroups = await refreshGroups(optimisticUsers);
+      const updatedGroup = refreshedGroups.find((g) => g.id === groupId) || group;
+
+      addActivity({
+        type: "member_added",
+        message: `Added ${userObj.name} to ${updatedGroup.name}`,
+        icon: "➕",
+      })
+
+      return updatedGroup;
+    } catch (error) {
+      await Promise.allSettled([refreshGroups(), refreshUsers()]);
+      throw new Error(error.message || "Failed to assign user to group");
+    }
+  }
+
+  const removeUserFromGroup = async (userId, groupId) => {
+    try {
+      const group = groups.find((g) => g.id === groupId);
+      const userObj = users.find((u) => u.id === userId);
+      if (!group) {
+        throw new Error("Group not found");
+      }
+
+      // Clear user assignment
+      const updatedUser = await usersAPI.update(userId, { groupId: null, groupName: null });
+      const userWithoutGroup = {
+        ...userObj,
+        ...updatedUser,
+        groupId: null,
+        groupName: "",
+        password: userObj?.password || userPasswords?.[userId],
+      }
+      const optimisticUsers = users.map((u) => (u.id === userId ? userWithoutGroup : u));
+      setUsers(optimisticUsers);
+
+      // Re-fetch groups to get updated membership
+      const refreshedGroups = await refreshGroups(optimisticUsers);
+      const updatedGroup = refreshedGroups.find((g) => g.id === groupId) || group;
+
+      addActivity({
+        type: "member_removed",
+        message: `Removed ${userObj?.name || "User"} from ${group.name}`,
+        icon: "➖",
+      })
+
+      return updatedGroup;
+    } catch (error) {
+      await Promise.allSettled([refreshGroups(), refreshUsers()]);
+      throw new Error(error.message || "Failed to remove user from group");
+    }
   }
 
   // Message management functions
@@ -280,9 +526,7 @@ export const AppProvider = ({ children }) => {
       id: Date.now(),
       timestamp: new Date().toISOString(),
     }
-    const updatedMessages = [...messages, newMessage]
-    setMessages(updatedMessages)
-    localStorage.setItem("ummrah_messages", JSON.stringify(updatedMessages))
+    setMessages((prev) => [...prev, newMessage])
 
     addActivity({
       type: "message_sent",
@@ -320,10 +564,14 @@ export const AppProvider = ({ children }) => {
       addGroup,
       updateGroup,
       deleteGroup,
+      refreshUsers,
+      refreshGroups,
+      assignUserToGroup,
+      removeUserFromGroup,
       addMessage,
       updateStats,
     }),
-    [isAuthenticated, user, sidebarCollapsed, notifications, stats, recentActivities, currentPage, users, groups, messages, login, logout, toggleSidebar, addNotification, removeNotification, addActivity, updateCurrentPage, addUser, updateUser, deleteUser, addGroup, updateGroup, deleteGroup, addMessage, updateStats]
+    [isAuthenticated, user, sidebarCollapsed, notifications, stats, recentActivities, currentPage, users, groups, messages, login, logout, toggleSidebar, addNotification, removeNotification, addActivity, updateCurrentPage, addUser, updateUser, deleteUser, addGroup, updateGroup, deleteGroup, refreshUsers, refreshGroups, assignUserToGroup, removeUserFromGroup, addMessage, updateStats]
   )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

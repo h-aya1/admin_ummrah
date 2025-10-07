@@ -17,7 +17,7 @@ const Toast = ({ message, onClose }) => {
 
 
 const ManageGroups = () => {
-  const { users, groups, addUser, updateUser, deleteUser, addGroup, updateGroup, deleteGroup, addActivity } = useAppContext()
+  const { users, groups, addUser, updateUser, deleteUser, addGroup, updateGroup, deleteGroup, refreshUsers, refreshGroups, assignUserToGroup, removeUserFromGroup } = useAppContext()
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("groups")
   const [showAddModal, setShowAddModal] = useState(false)
@@ -28,39 +28,20 @@ const ManageGroups = () => {
 
   // Load data on component mount
   useEffect(() => {
-    // Data is already loaded by AppContext
-    setLoading(false)
-  }, [])
-
-  // Save users and groups to localStorage whenever they change
-  useEffect(() => {
-    if (!loading) {
-      localStorage.setItem("ummrah_users", JSON.stringify(users))
-      localStorage.setItem("ummrah_groups", JSON.stringify(groups))
-    }
-  }, [users, groups, loading])
-
-  // Listen for external updates (e.g. AddMemberSection) and reload
-  useEffect(() => {
-    const onDataUpdated = () => {
-      const storedUsers = localStorage.getItem("ummrah_users")
-      const storedGroups = localStorage.getItem("ummrah_groups")
-      if (storedUsers) setUsers(JSON.parse(storedUsers))
-      if (storedGroups) {
-        const parsedGroups = JSON.parse(storedGroups)
-        setGroups(parsedGroups)
-        // If a group modal is open, refresh its data from the updated groups
-        setSelectedGroup((prev) => {
-          if (!prev) return prev
-          const refreshed = parsedGroups.find((g) => g.id === prev.id)
-          return refreshed || prev
-        })
+    let isMounted = true
+    const init = async () => {
+      try {
+        setLoading(true)
+        await Promise.all([refreshUsers(), refreshGroups()])
+      } catch (err) {
+        if (isMounted) setToastMsg(err.message || 'Failed to load data')
+      } finally {
+        if (isMounted) setLoading(false)
       }
     }
-
-    window.addEventListener("dataUpdated", onDataUpdated)
-    return () => window.removeEventListener("dataUpdated", onDataUpdated)
-  }, [])
+    init()
+    return () => { isMounted = false }
+  }, [refreshUsers, refreshGroups])
 
   const handleAddItem = () => {
     setEditingItem(null)
@@ -72,25 +53,50 @@ const ManageGroups = () => {
     setShowAddModal(true)
   }
 
-  const handleDeleteItem = (id, type) => {
+  const handleDeleteItem = async (id, type) => {
     if (window.confirm(`Are you sure you want to delete this ${type}?`)) {
-      if (type === "group") {
-        deleteGroup(id)
-        setToastMsg("Group deleted")
-      } else {
-        deleteUser(id)
-        setToastMsg("User deleted from system")
+      try {
+        if (type === "group") {
+          await deleteGroup(id)
+          setToastMsg("Group deleted")
+        } else {
+          await deleteUser(id)
+          setToastMsg("User deleted from system")
+        }
+      } catch (err) {
+        setToastMsg(err.message || `Failed to delete ${type}`)
       }
     }
   }
 
-  const handleUpdateGroup = (updatedGroup) => {
-    updateGroup(updatedGroup.id, updatedGroup)
-    setSelectedGroup(updatedGroup)
+  const handleUpdateGroup = async (updatedGroup) => {
+    try {
+      const res = await updateGroup(updatedGroup.id, updatedGroup)
+      setSelectedGroup(res)
+      setToastMsg('Group updated')
+    } catch (err) {
+      setToastMsg(err.message || 'Failed to update group')
+    }
   }
 
-  const handleAssignUserToGroup = (userId, groupId, groupName) => {
-    updateUser(userId, { groupId, groupName })
+  const handleAssignUserToGroup = async (userId, groupId) => {
+    try {
+      const updated = await assignUserToGroup(userId, groupId)
+      setSelectedGroup(updated)
+      setToastMsg('Member added to group')
+    } catch (err) {
+      setToastMsg(err.message || 'Failed to assign user to group')
+    }
+  }
+
+  const handleRemoveUserFromGroup = async (userId, groupId) => {
+    try {
+      const updated = await removeUserFromGroup(userId, groupId)
+      setSelectedGroup(updated)
+      setToastMsg('Member removed from group')
+    } catch (err) {
+      setToastMsg(err.message || 'Failed to remove member')
+    }
   }
 
   if (loading) {
@@ -145,6 +151,7 @@ const ManageGroups = () => {
           users={users}
           onUpdateGroup={handleUpdateGroup}
           onAssignUser={handleAssignUserToGroup}
+          onRemoveUser={handleRemoveUserFromGroup}
           onClose={() => setSelectedGroup(null)}
         />
       )}
@@ -156,23 +163,30 @@ const ManageGroups = () => {
           groups={groups}
           users={users}
           onClose={() => setShowAddModal(false)}
-          onSave={(itemData) => {
-            if (activeTab === "groups") {
-              if (editingItem) {
-                updateGroup(editingItem.id, itemData)
+          onSave={async (itemData) => {
+            try {
+              if (activeTab === "groups") {
+                if (editingItem) {
+                  await updateGroup(editingItem.id, itemData)
+                  setToastMsg('Group updated')
+                } else {
+                  await addGroup(itemData)
+                  setToastMsg('Group created')
+                }
               } else {
-                const newGroup = addGroup(itemData)
-                // The addGroup function already handles updating the amir user's group assignment
+                if (editingItem) {
+                  await updateUser(editingItem.id, itemData)
+                  setToastMsg('User updated')
+                } else {
+                  const created = await addUser(itemData)
+                  if (created && created.password) setNewUserPassword(created.password)
+                  setToastMsg('User created')
+                }
               }
-            } else {
-              if (editingItem) {
-                updateUser(editingItem.id, itemData)
-              } else {
-                const newUser = addUser(itemData)
-                setNewUserPassword(newUser.password)
-              }
+              setShowAddModal(false)
+            } catch (err) {
+              setToastMsg(err.message || 'Operation failed')
             }
-            setShowAddModal(false)
           }}
         />
       )}
@@ -224,11 +238,11 @@ const GroupsView = ({ groups, onEdit, onDelete, onView }) => {
 
           <div className="group-stats">
             <div className="stat">
-              <span className="stat-value">{group.totalMembers}</span>
+              <span className="stat-value">{Array.isArray(group.members) ? group.members.length : (group.totalMembers ?? 0)}</span>
               <span className="stat-label">Total Members</span>
             </div>
             <div className="stat">
-              <span className="stat-value">{group.activeMembers}</span>
+              <span className="stat-value">{group.activeMembers ?? 0}</span>
               <span className="stat-label">Active</span>
             </div>
           </div>
@@ -236,16 +250,16 @@ const GroupsView = ({ groups, onEdit, onDelete, onView }) => {
           <div className="group-meta">
             <div className="meta-item">
               <span className="meta-icon">📍</span>
-              <span className="meta-text">{group.location}</span>
+              <span className="meta-text">{group.location || "N/A"}</span>
             </div>
             <div className="meta-item">
               <span className="meta-icon">🕐</span>
-              <span className="meta-text">Last activity: {new Date(group.lastActivity).toLocaleTimeString()}</span>
+              <span className="meta-text">Last activity: {group.lastActivity ? new Date(group.lastActivity).toLocaleTimeString() : "N/A"}</span>
             </div>
           </div>
 
           <div className="group-footer">
-            <span className="created-date">Created: {group.createdAt}</span>
+            <span className="created-date">Created: {group.createdAt || "N/A"}</span>
           </div>
         </div>
       ))}
@@ -337,40 +351,47 @@ const UsersView = ({ users, onEdit, onDelete }) => {
 }
 
 // AddMemberSection component
-const AddMemberSection = ({ group, users, onAssignUser, onUpdateGroup }) => {
+const AddMemberSection = ({ group, users, onAssignUser }) => {
   const members = Array.isArray(group?.members) ? group.members : []
   // Filter out users who are already members (including the amir who is auto-added)
-  const available = users.filter((u) => !members.some((m) => m.id === u.id))
-  const [selectedUserId, setSelectedUserId] = useState(available.length ? String(available[0].id) : '')
+  const available = users.filter((u) => (
+    u.role !== 'admin' && !members.some((m) => String(m.id) === String(u.id))
+  ))
+  const [selectedUserId, setSelectedUserId] = useState('')
   const [toastMsg, setToastMsg] = useState('')
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     // when users or group changes, update the selected user id
-    setSelectedUserId(available.length ? String(available[0].id) : '')
-  }, [group?.id, users.length])
+    if (available.length > 0 && !selectedUserId) {
+      setSelectedUserId(String(available[0].id))
+    }
+    if (available.length === 0 && selectedUserId) {
+      setSelectedUserId('')
+    }
+  }, [group?.id, users.length, available.length, selectedUserId])
 
-  const handleAdd = () => {
-    const uid = typeof selectedUserId === 'string' ? Number(selectedUserId) : selectedUserId
-    const user = users.find((u) => u.id === uid)
-    if (!user) {
-      setToastMsg('Select a valid user')
+  const handleAdd = async () => {
+    if (!selectedUserId) {
+      setToastMsg('Please select a user from the dropdown')
       return
     }
 
-    const newMember = { id: user.id, name: user.name, phone: user.phone }
-
-    const updatedGroup = { ...group }
-    updatedGroup.members = Array.isArray(updatedGroup.members) ? [...updatedGroup.members] : []
-    updatedGroup.members.push(newMember)
-    updatedGroup.totalMembers = updatedGroup.totalMembers ? updatedGroup.totalMembers + 1 : updatedGroup.members.length
-
-    // inform parent to update group state
-    if (typeof onUpdateGroup === 'function') onUpdateGroup(updatedGroup)
-
-    // inform parent to assign user to group
-    if (typeof onAssignUser === 'function') onAssignUser(user.id, updatedGroup.id, updatedGroup.name)
-
-    setToastMsg(`${user.name} added to ${group.name}`)
+    const uid = selectedUserId
+    const user = users.find((u) => String(u.id) === String(uid))
+    if (!user) {
+      setToastMsg('Selected user not found. Please refresh and try again.')
+      return
+    }
+    try {
+      setBusy(true)
+      await onAssignUser(user.id, group.id)
+      setToastMsg(`${user.name} added to ${group.name}`)
+    } catch (err) {
+      setToastMsg(err.message || 'Failed to add member')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -390,7 +411,7 @@ const AddMemberSection = ({ group, users, onAssignUser, onUpdateGroup }) => {
               <option key={u.id} value={u.id}>{u.name} - {u.phone}</option>
             ))}
           </select>
-          <button className="btn btn-primary add-member-btn" onClick={handleAdd}>
+          <button className="btn btn-primary add-member-btn" onClick={handleAdd} disabled={busy}>
             Add Member
           </button>
         </div>
@@ -400,19 +421,18 @@ const AddMemberSection = ({ group, users, onAssignUser, onUpdateGroup }) => {
   )
 }
 
-const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignUser }) => {
+const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignUser, onRemoveUser }) => {
   const members = Array.isArray(group?.members) ? group.members : []
   const totalMembers = members.length
   const lastActivity = group?.lastActivity ? new Date(group.lastActivity).toLocaleString() : "N/A"
+  const activeMembers = typeof group?.activeMembers === 'number' ? group.activeMembers : 0
+  const offlineMembers = Math.max(0, totalMembers - activeMembers)
 
-  // Remove member handler
-  const handleRemoveMember = (memberId) => {
-    const updatedGroup = { ...group }
-    updatedGroup.members = Array.isArray(updatedGroup.members)
-      ? updatedGroup.members.filter((m) => m.id !== memberId)
-      : []
-    updatedGroup.totalMembers = updatedGroup.members.length
-    if (typeof onUpdateGroup === "function") onUpdateGroup(updatedGroup)
+  // Remove member handler (backend)
+  const handleRemoveMember = async (memberId) => {
+    if (typeof onRemoveUser === 'function') {
+      await onRemoveUser(memberId, group.id)
+    }
   }
 
   return (
@@ -482,7 +502,7 @@ const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignU
               ))}
             </div>
             {/* Add member form */}
-            <AddMemberSection group={group} users={users} onAssignUser={onAssignUser} onUpdateGroup={onUpdateGroup} />
+            <AddMemberSection group={group} users={users} onAssignUser={onAssignUser} />
           </div>
         </div>
       </div>

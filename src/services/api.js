@@ -19,11 +19,29 @@ const apiCall = async (endpoint, options = {}) => {
   const response = await fetch(url, { ...options, headers });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Network error' }));
-    throw new Error(error.message || `HTTP ${response.status}`);
+    let message = '';
+    try {
+      const text = await response.text();
+      if (text) {
+        try {
+          const data = JSON.parse(text);
+          message = data?.message || data?.error || data?.errors?.[0]?.message || '';
+        } catch {
+          message = text; // non-JSON body
+        }
+      }
+    } catch {
+      // ignore
+    }
+    const statusInfo = `${response.status} ${response.statusText}`;
+    throw new Error(message ? `${statusInfo} - ${message}` : statusInfo);
   }
 
-  return response.json();
+  // No content
+  if (response.status === 204) return null;
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) return null;
+  return response.json().catch(() => null);
 };
 
 export const authAPI = {
@@ -42,38 +60,89 @@ export const authAPI = {
   },
 };
 
+// Users API
 export const usersAPI = {
   async getAll() {
-    return apiCall('/admin/users');
+    return apiCall('/users'); // GET all users
+  },
+
+  async getById(id) {
+    return apiCall(`/users/${id}`);
+  },
+
+  async create(payload) {
+    return apiCall('/users', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async update(id, payload) {
+    return apiCall(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async delete(id) {
+    return apiCall(`/users/${id}`, {
+      method: 'DELETE',
+    });
   },
 };
 
+// Groups API
 export const groupsAPI = {
   async getAll() {
-    await delay(300);
-    return { data: [
-      { id: 'g1', name: 'Group A', status: 'active', members: [{ id: 'u1' }, { id: 'u2' }], amir: { id: 'a1', name: 'Ustadh Bilal' }, createdAt: new Date().toISOString() },
-      { id: 'g2', name: 'Group B', status: 'inactive', members: [{ id: 'u3' }], amir: null, createdAt: new Date().toISOString() },
-    ] };
+    return apiCall('/groups'); // GET all groups
+  },
+
+  async create(payload) {
+    return apiCall('/groups', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async update(id, payload) {
+    return apiCall(`/groups/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async delete(id) {
+    return apiCall(`/groups/${id}`, {
+      method: 'DELETE',
+    });
   },
 };
 
+
+//Duas
 export const duasAPI = {
   async getAll() {
-    await delay(300);
-    return { data: [] };
+    return apiCall('/duas');
+  },
+  async getOne(id) {
+    return apiCall(`/duas/${id}`);
   },
   async create(payload) {
-    await delay(200);
-    return { data: { id: Math.random().toString(36).slice(2), ...payload } };
+    return apiCall('/duas', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
   async update(id, payload) {
-    await delay(200);
-    return { data: { id, ...payload } };
+    return apiCall(`/duas/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
   },
-  async delete() {
-    await delay(150);
-    return { ok: true };
+  async delete(id) {
+    return apiCall(`/duas/${id}`, {
+      method: 'DELETE',
+    });
   },
 };
 
