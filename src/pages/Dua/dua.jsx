@@ -47,6 +47,17 @@ const Dua = () => {
     loadData()
   }, [refreshDuas, refreshDuaCategories, addNotification])
 
+  // Debug effect to check duas data
+  useEffect(() => {
+    console.log('Duas data:', duas)
+    console.log('First dua:', duas[0])
+    if (duas[0]) {
+      console.log('First dua translation:', duas[0].translation)
+      console.log('Translation type:', typeof duas[0].translation)
+      console.log('Audio:', duas[0].audio)
+    }
+  }, [duas])
+
   // Sync categories with API data
   useEffect(() => {
     if (duaCategories && duaCategories.length > 0) {

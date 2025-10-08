@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { authAPI, usersAPI, groupsAPI, duasAPI } from "../services/api"
 
+const API_BASE_URL = 'http://localhost:3000'; // Should match the one in api.js
+
 const generateRandomPassword = (length = 10) => {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@$!%*?&"
   let password = ""
@@ -549,8 +551,19 @@ export const AppProvider = ({ children }) => {
   const refreshDuas = useCallback(async (filters = {}) => {
     try {
       const data = await duasAPI.getAll(filters);
-      setDuas(data);
-      return data;
+      // Ensure translation field is parsed as object if it's a string
+      const processedData = data.map(dua => ({
+        ...dua,
+        translation: typeof dua.translation === 'string' 
+          ? JSON.parse(dua.translation) 
+          : dua.translation,
+        // Ensure audio URLs are properly formatted
+        audio: dua.audio && !dua.audio.startsWith('http') 
+          ? `${API_BASE_URL}${dua.audio.startsWith('/') ? '' : '/'}${dua.audio}` 
+          : dua.audio
+      }));
+      setDuas(processedData);
+      return processedData;
     } catch (error) {
       throw new Error(error.message || "Failed to fetch duas");
     }
