@@ -7,6 +7,43 @@ const getAuthHeaders = () => {
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 };
 
+// Helper for API calls with file uploads
+const apiCallWithFiles = async (endpoint, options = {}) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const headers = {
+    ...getAuthHeaders(),
+    ...options.headers,
+  };
+
+  // Don't set Content-Type for FormData, let browser set it
+  const response = await fetch(url, { ...options, headers });
+
+  if (!response.ok) {
+    let message = '';
+    try {
+      const text = await response.text();
+      if (text) {
+        try {
+          const data = JSON.parse(text);
+          message = data?.message || data?.error || data?.errors?.[0]?.message || '';
+        } catch {
+          message = text; // non-JSON body
+        }
+      }
+    } catch {
+      // ignore
+    }
+    const statusInfo = `${response.status} ${response.statusText}`;
+    throw new Error(message ? `${statusInfo} - ${message}` : statusInfo);
+  }
+
+  // No content
+  if (response.status === 204) return null;
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) return null;
+  return response.json().catch(() => null);
+};
+
 // Helper for API calls
 const apiCall = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -121,22 +158,29 @@ export const groupsAPI = {
 
 //Duas
 export const duasAPI = {
-  async getAll() {
-    return apiCall('/duas');
+  async getAll(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.search) params.append('search', filters.search);
+    if (filters.category) params.append('category', filters.category);
+    const queryString = params.toString();
+    return apiCall(`/duas${queryString ? `?${queryString}` : ''}`);
+  },
+  async getCategories() {
+    return apiCall('/duas/categories');
   },
   async getOne(id) {
     return apiCall(`/duas/${id}`);
   },
-  async create(payload) {
-    return apiCall('/duas', {
+  async create(formData) {
+    return apiCallWithFiles('/duas', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: formData,
     });
   },
-  async update(id, payload) {
-    return apiCall(`/duas/${id}`, {
+  async update(id, formData) {
+    return apiCallWithFiles(`/duas/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(payload),
+      body: formData,
     });
   },
   async delete(id) {

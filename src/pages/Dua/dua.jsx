@@ -1,8 +1,19 @@
 import { useState, useEffect } from "react"
+import { useAppContext } from "../../contexts/AppContext"
 import "./dua.css"
 
 const Dua = () => {
-  const [duas, setDuas] = useState([])
+  const {
+    duas,
+    duaCategories,
+    refreshDuas,
+    refreshDuaCategories,
+    addDua,
+    updateDua,
+    deleteDua,
+    addNotification
+  } = useAppContext()
+  
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingDua, setEditingDua] = useState(null)
@@ -18,53 +29,37 @@ const Dua = () => {
   const [showCategoryModal, setShowCategoryModal] = useState(false)
 
   useEffect(() => {
-    loadDuas()
-  }, [])
+    const loadData = async () => {
+      setLoading(true)
+      try {
+        await Promise.all([refreshDuas(), refreshDuaCategories()])
+      } catch (error) {
+        console.error('Failed to load duas:', error)
+        addNotification({
+          type: 'error',
+          message: 'Failed to load duas',
+          duration: 5000,
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [refreshDuas, refreshDuaCategories, addNotification])
+
+  // Sync categories with API data
+  useEffect(() => {
+    if (duaCategories && duaCategories.length > 0) {
+      // Filter out "all" from API categories and add it only once at the beginning
+      const apiCategories = duaCategories.filter(cat => cat !== "all");
+      setCategories(["all", ...apiCategories]);
+    }
+  }, [duaCategories])
 
   // Persist categories when they change
   useEffect(() => {
     localStorage.setItem("duaCategories", JSON.stringify(categories))
   }, [categories])
-
-  const loadDuas = async () => {
-    setLoading(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    const mockDuas = [
-      {
-        id: 1,
-        title: "Dua for Travel",
-        arabic: "سُبْحَانَ الَّذِي سَخَّرَ لَنَا هَذَا وَمَا كُنَّا لَهُ مُقْرِنِينَ",
-        translation: {
-          english: "Glory be to Him who has subjected this to us, and we could never have it (by our efforts).",
-          amharic: "ይህንን ለእኛ ያስገዛልን ለእርሱ ክብር ይሁን፣ እኛም በራሳችን ጥረት ሊኖረን አይችልም።",
-          oromo: "Ulfinni kan kana nuuf bulchee jiru haa ta'u, nuti mataa keenyaan argachuu hin dandeenyu.",
-        },
-        category: "travel",
-        createdAt: "2024-01-15",
-        updatedAt: "2024-01-20",
-        audio: "sample-audio-1.mp3",
-      },
-      {
-        id: 2,
-        title: "Dua for Protection",
-        arabic: "أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ",
-        translation: {
-          english: "I seek refuge in the perfect words of Allah from the evil of what He has created.",
-          amharic: "በአላህ ፍጹም ቃላት ከፈጠራቸው ክፋት እጠብቃለሁ።",
-          oromo: "Jecha Allah kan mudaa hin qabne sanaan waan uume hundumaa irraa nan eega.",
-        },
-        category: "protection",
-        createdAt: "2024-01-10",
-        updatedAt: "2024-01-18",
-        audio: "sample-audio-2.mp3",
-      },
-    ]
-
-    setDuas(mockDuas)
-    setLoading(false)
-  }
 
   const filteredDuas = duas.filter((dua) => {
     const matchesSearch = dua.title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -124,9 +119,23 @@ const Dua = () => {
     return { success: true }
   }
 
-  const handleAddDua = () => {
-    setEditingDua(null)
-    setShowAddModal(true)
+  const handleAddDua = async (duaData) => {
+    try {
+      await addDua(duaData)
+      setShowAddModal(false)
+      setEditingDua(null)
+      addNotification({
+        type: 'success',
+        message: 'Dua added successfully',
+        duration: 3000,
+      })
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        message: error.message || 'Failed to add dua',
+        duration: 5000,
+      })
+    }
   }
 
   const handleEditDua = (dua) => {
@@ -134,9 +143,41 @@ const Dua = () => {
     setShowAddModal(true)
   }
 
-  const handleDeleteDua = (id) => {
+  const handleUpdateDua = async (duaData) => {
+    try {
+      await updateDua(editingDua.id, duaData)
+      setShowAddModal(false)
+      setEditingDua(null)
+      addNotification({
+        type: 'success',
+        message: 'Dua updated successfully',
+        duration: 3000,
+      })
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        message: error.message || 'Failed to update dua',
+        duration: 5000,
+      })
+    }
+  }
+
+  const handleDeleteDua = async (id) => {
     if (window.confirm("Are you sure you want to delete this dua?")) {
-      setDuas(duas.filter((dua) => dua.id !== id))
+      try {
+        await deleteDua(id)
+        addNotification({
+          type: 'success',
+          message: 'Dua deleted successfully',
+          duration: 3000,
+        })
+      } catch (error) {
+        addNotification({
+          type: 'error',
+          message: error.message || 'Failed to delete dua',
+          duration: 5000,
+        })
+      }
     }
   }
 
@@ -157,7 +198,7 @@ const Dua = () => {
           <p>Manage prayers and supplications for pilgrims</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-primary" onClick={handleAddDua}>
+          <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
             Add New Dua
           </button>
           <button className="btn btn-secondary" onClick={() => setShowCategoryModal(true)}>
@@ -170,6 +211,8 @@ const Dua = () => {
         <div className="search-box">
           <input
             type="text"
+            id="search-duas"
+            name="searchDuas"
             placeholder="Search duas..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -245,14 +288,7 @@ const Dua = () => {
         <DuaModal
           dua={editingDua}
           onClose={() => setShowAddModal(false)}
-          onSave={(duaData) => {
-            if (editingDua) {
-              setDuas(duas.map((d) => (d.id === editingDua.id ? { ...d, ...duaData } : d)))
-            } else {
-              setDuas([...duas, { ...duaData, id: Date.now(), createdAt: new Date().toISOString().split("T")[0] }])
-            }
-            setShowAddModal(false)
-          }}
+          onSave={editingDua ? handleUpdateDua : handleAddDua}
           categories={categories}
         />
       )}
@@ -290,11 +326,14 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
     category: dua?.category || (categories.find((c) => c !== "all") || ""),
     audio: dua?.audio || "",
   })
+  const [audioFile, setAudioFile] = useState(null) // Store the actual file
 
   const handleChange = (e) => {
     const { name, value, files } = e.target
     if (name === "audio" && files && files[0]) {
-      // Convert audio file to a local URL for preview
+      // Store the file for upload
+      setAudioFile(files[0])
+      // Create preview URL
       setFormData({ ...formData, audio: URL.createObjectURL(files[0]) })
     } else if (name.startsWith("translation.")) {
       const lang = name.split(".")[1]
@@ -312,7 +351,12 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onSave(formData)
+    // Pass the file separately for the API call
+    const duaData = {
+      ...formData,
+      audioFile: audioFile, // Only include file if it's a new upload
+    }
+    onSave(duaData)
   }
 
   return (
@@ -328,12 +372,13 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
         <form onSubmit={handleSubmit} className="dua-form">
           <div className="form-group">
             <label>Title</label>
-            <input type="text" name="title" value={formData.title} onChange={handleChange} className="input" required />
+            <input type="text" id="title" name="title" value={formData.title} onChange={handleChange} className="input" required />
           </div>
 
           <div className="form-group">
             <label>Arabic Text</label>
             <textarea
+              id="arabic"
               name="arabic"
               value={formData.arabic}
               onChange={handleChange}
@@ -345,8 +390,8 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
 
 
           <div className="form-group">
-            <label>Audio</label>
-            <input type="file" name="audio" accept="audio/*" onChange={handleChange} className="input" required />
+            <label>Audio {dua ? "(optional - leave empty to keep current)" : ""}</label>
+            <input type="file" id="audio" name="audio" accept="audio/*" onChange={handleChange} className="input" required={!dua} />
             {formData.audio && (
               <audio controls src={formData.audio} style={{ width: "100%", marginTop: "8px" }}>
                 Your browser does not support the audio element.
@@ -360,6 +405,7 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
             <div className="form-group">
               <label>English</label>
               <textarea
+                id="translation-english"
                 name="translation.english"
                 value={formData.translation.english}
                 onChange={handleChange}
@@ -372,6 +418,7 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
             <div className="form-group">
               <label>Amharic</label>
               <textarea
+                id="translation-amharic"
                 name="translation.amharic"
                 value={formData.translation.amharic}
                 onChange={handleChange}
@@ -384,6 +431,7 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
             <div className="form-group">
               <label>Oromo</label>
               <textarea
+                id="translation-oromo"
                 name="translation.oromo"
                 value={formData.translation.oromo}
                 onChange={handleChange}
@@ -397,7 +445,7 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
           <div className="form-row">
             <div className="form-group">
               <label>Category</label>
-              <select name="category" value={formData.category} onChange={handleChange} className="input" required>
+              <select id="category" name="category" value={formData.category} onChange={handleChange} className="input" required>
                 {categories
                   .filter((c) => c !== "all")
                   .map((c) => (
@@ -423,8 +471,6 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
     </div>
   )
 }
-
-export default Dua
 
 const CategoryModal = ({ categories = [], onClose, onAddCategory, onDeleteCategory, onRenameCategory }) => {
   const [newName, setNewName] = useState("")
@@ -455,6 +501,8 @@ const CategoryModal = ({ categories = [], onClose, onAddCategory, onDeleteCatego
           <div className="form-group" style={{ display: "flex", gap: 8 }}>
             <input
               type="text"
+              id="new-category-name"
+              name="newCategoryName"
               placeholder="New category name"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -468,7 +516,13 @@ const CategoryModal = ({ categories = [], onClose, onAddCategory, onDeleteCatego
               <div key={c} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0" }}>
                 {editing === c ? (
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1 }}>
-                    <input className="input" value={editValue} onChange={(e) => setEditValue(e.target.value)} />
+                    <input 
+                      id={`edit-category-${c}`}
+                      name={`editCategory${c}`}
+                      className="input" 
+                      value={editValue} 
+                      onChange={(e) => setEditValue(e.target.value)} 
+                    />
                     <button className="btn btn-primary" onClick={saveEdit}>Save</button>
                     <button className="btn btn-secondary" onClick={() => { setEditing(null); setEditValue("") }}>Cancel</button>
                   </div>
@@ -499,3 +553,5 @@ const CategoryModal = ({ categories = [], onClose, onAddCategory, onDeleteCatego
     </div>
   )
 }
+
+export default Dua

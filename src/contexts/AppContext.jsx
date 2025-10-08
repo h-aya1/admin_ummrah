@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { authAPI, usersAPI, groupsAPI } from "../services/api"
+import { authAPI, usersAPI, groupsAPI, duasAPI } from "../services/api"
 
 const generateRandomPassword = (length = 10) => {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@$!%*?&"
@@ -106,6 +106,8 @@ export const AppProvider = ({ children }) => {
   const [users, setUsers] = useState([])
   const [groups, setGroups] = useState([])
   const [messages, setMessages] = useState([])
+  const [duas, setDuas] = useState([])
+  const [duaCategories, setDuaCategories] = useState([])
   const usersRef = useRef([])
 
   // Load data from API when authenticated
@@ -113,9 +115,11 @@ export const AppProvider = ({ children }) => {
     const loadData = async () => {
       if (isAuthenticated) {
         try {
-          const [usersResponse, groupsResponse] = await Promise.all([
+          const [usersResponse, groupsResponse, duasResponse, categoriesResponse] = await Promise.all([
             usersAPI.getAll(),
             groupsAPI.getAll(),
+            duasAPI.getAll(),
+            duasAPI.getCategories(),
           ]);
           const usersWithPasswords = usersResponse.map((user) => (
             userPasswords?.[user.id]
@@ -125,6 +129,8 @@ export const AppProvider = ({ children }) => {
           setUsers(usersWithPasswords);
           usersRef.current = usersWithPasswords;
           setGroups(normalizeGroupsWithAmir(groupsResponse, usersWithPasswords));
+          setDuas(duasResponse);
+          setDuaCategories(categoriesResponse || []);
         } catch (error) {
           console.error('Failed to load data:', error);
           // If unauthorized, logout the user
@@ -195,27 +201,27 @@ export const AppProvider = ({ children }) => {
     setSidebarCollapsed(!sidebarCollapsed)
   }
 
-  const addNotification = (notification) => {
+  const addNotification = useCallback((notification) => {
     const newNotification = {
       id: Date.now(),
       timestamp: new Date(),
       ...notification,
     }
     setNotifications((prev) => [newNotification, ...prev])
-  }
+  }, [])
 
-  const removeNotification = (id) => {
+  const removeNotification = useCallback((id) => {
     setNotifications((prev) => prev.filter((notif) => notif.id !== id))
-  }
+  }, [])
 
-  const addActivity = (activity) => {
+  const addActivity = useCallback((activity) => {
     const newActivity = {
       id: Date.now(),
       timestamp: new Date(),
       ...activity,
     }
     setRecentActivities((prev) => [newActivity, ...prev.slice(0, 9)]) // Keep only last 10 activities
-  }
+  }, [])
 
   const updateCurrentPage = (page) => {
     setCurrentPage(page)
@@ -539,6 +545,99 @@ export const AppProvider = ({ children }) => {
     setStats((prev) => ({ ...prev, ...newStats }))
   }, [])
 
+  // Dua management functions
+  const refreshDuas = useCallback(async (filters = {}) => {
+    try {
+      const data = await duasAPI.getAll(filters);
+      setDuas(data);
+      return data;
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch duas");
+    }
+  }, []);
+
+  const refreshDuaCategories = useCallback(async () => {
+    try {
+      const data = await duasAPI.getCategories();
+      setDuaCategories(data || []);
+      return data;
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch dua categories");
+    }
+  }, []);
+
+  const addDua = async (duaData) => {
+    try {
+      const formData = new FormData();
+      
+      // Add text fields
+      formData.append('title', duaData.title);
+      formData.append('arabic', duaData.arabic);
+      formData.append('category', duaData.category);
+      formData.append('translation', JSON.stringify(duaData.translation));
+      
+      // Add audio file if provided
+      if (duaData.audioFile) {
+        formData.append('audio', duaData.audioFile);
+      }
+
+      const created = await duasAPI.create(formData);
+      setDuas((prev) => [...prev, created]);
+      addActivity({
+        type: "dua_added",
+        message: `Admin added new dua: ${created.title}`,
+        icon: "📿",
+      });
+      return created;
+    } catch (error) {
+      throw new Error(error.message || "Failed to add dua");
+    }
+  }
+
+  const updateDua = async (duaId, duaData) => {
+    try {
+      const formData = new FormData();
+      
+      // Add text fields
+      formData.append('title', duaData.title);
+      formData.append('arabic', duaData.arabic);
+      formData.append('category', duaData.category);
+      formData.append('translation', JSON.stringify(duaData.translation));
+      
+      // Add audio file if provided (optional for updates)
+      if (duaData.audioFile) {
+        formData.append('audio', duaData.audioFile);
+      }
+
+      const updated = await duasAPI.update(duaId, formData);
+      setDuas((prev) => prev.map((d) => (d.id === duaId ? updated : d)));
+      addActivity({
+        type: "dua_updated",
+        message: `Admin updated dua: ${updated.title}`,
+        icon: "✏️",
+      });
+      return updated;
+    } catch (error) {
+      throw new Error(error.message || "Failed to update dua");
+    }
+  }
+
+  const deleteDua = async (duaId) => {
+    try {
+      const duaToDelete = duas.find((d) => d.id === duaId);
+      await duasAPI.delete(duaId);
+      setDuas((prev) => prev.filter((d) => d.id !== duaId));
+      addActivity({
+        type: "dua_deleted",
+        message: `Admin deleted dua: ${duaToDelete?.title || duaId}`,
+        icon: "🗑️",
+      });
+      return true;
+    } catch (error) {
+      throw new Error(error.message || "Failed to delete dua");
+    }
+  }
+
   const value = useMemo(
     () => ({
       isAuthenticated,
@@ -551,6 +650,8 @@ export const AppProvider = ({ children }) => {
       users,
       groups,
       messages,
+      duas,
+      duaCategories,
       login,
       logout,
       toggleSidebar,
@@ -570,8 +671,13 @@ export const AppProvider = ({ children }) => {
       removeUserFromGroup,
       addMessage,
       updateStats,
+      refreshDuas,
+      refreshDuaCategories,
+      addDua,
+      updateDua,
+      deleteDua,
     }),
-    [isAuthenticated, user, sidebarCollapsed, notifications, stats, recentActivities, currentPage, users, groups, messages, login, logout, toggleSidebar, addNotification, removeNotification, addActivity, updateCurrentPage, addUser, updateUser, deleteUser, addGroup, updateGroup, deleteGroup, refreshUsers, refreshGroups, assignUserToGroup, removeUserFromGroup, addMessage, updateStats]
+    [isAuthenticated, user, sidebarCollapsed, notifications, stats, recentActivities, currentPage, users, groups, messages, duas, duaCategories, login, logout, toggleSidebar, addNotification, removeNotification, addActivity, updateCurrentPage, addUser, updateUser, deleteUser, addGroup, updateGroup, deleteGroup, refreshUsers, refreshGroups, assignUserToGroup, removeUserFromGroup, addMessage, updateStats, refreshDuas, refreshDuaCategories, addDua, updateDua, deleteDua]
   )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
