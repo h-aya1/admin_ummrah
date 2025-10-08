@@ -190,6 +190,39 @@ export const duasAPI = {
   },
 };
 
+export const placesAPI = {
+  async getAll(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.city) params.append('city', filters.city);
+    const queryString = params.toString();
+    return apiCall(`/places${queryString ? `?${queryString}` : ''}`);
+  },
+
+  async getById(id) {
+    return apiCall(`/places/${id}`);
+  },
+
+  async create(payload) {
+    return apiCall('/places', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async update(id, payload) {
+    return apiCall(`/places/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async delete(id) {
+    return apiCall(`/places/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 export const guidesAPI = {
   async getAll() {
     await delay(300);

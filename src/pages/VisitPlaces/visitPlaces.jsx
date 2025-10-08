@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import "./visitPlaces.css"
+import { placesAPI } from "../../services/api"
 
 const VisitPlaces = () => {
   const [places, setPlaces] = useState([])
@@ -7,66 +8,28 @@ const VisitPlaces = () => {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingPlace, setEditingPlace] = useState(null)
   const [selectedCity, setSelectedCity] = useState("all")
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(null)
 
   const cities = ["all", "makkah", "medina", "other"]
 
   useEffect(() => {
     loadPlaces()
-  }, [])
+  }, [selectedCity])
 
   const loadPlaces = async () => {
     setLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    const mockPlaces = [
-      {
-        id: 1,
-        name: "Masjid al-Haram",
-        description: {
-          english: "The holiest mosque in Islam, surrounding the Kaaba",
-          amharic: "በእስላም ሃይማኖት የሆነ ተቀዳሚ መስጊድ፣ ካዕባን ከተለወጠበት",
-          oromo: "Masjiid al-Haram, ka'abaa naannoo keessa jiru, islaama keessatti kan qubata"
-        },
-        city: "makkah",
-        mapLocation: "https://maps.google.com/?q=21.4225,39.8262",
-        images: ["/masjid-al-haram.jpg"],
-        createdAt: "2024-01-15",
-      },
-      {
-        id: 2,
-        name: "Masjid an-Nabawi",
-        description: {
-          english: "The Prophet's Mosque in Medina",
-          amharic: "በመዲና ሆነው የነቢዩ መስጊድ",
-          oromo: "Masjiid an-Nabawi, magaalaa Madinaa keessatti argamu"
-        },
-        city: "medina",
-        mapLocation: "https://maps.google.com/?q=24.4672,39.6117",
-        images: ["/masjid-an-nabawi.jpg"],    
-        createdAt: "2024-01-10",
-      },
-      {
-        id: 3,
-        name: "Mount Arafat",
-        description: {
-          english: "The hill where Prophet Muhammad delivered his farewell sermon",
-          amharic: "ነቢዩ ሙሃመድ የራሱን የተለያዩ ማብራሪያ ያቀረባበት ኮሌ",
-          oromo: "Duka'a Arafat, nabiyyi Muhammad (s.w.t.) yaad-annoo jalqabaa isaaniif dubbate"
-        },
-        city: "makkah",
-        mapLocation: "https://maps.google.com/?q=21.3544,39.9857",
-        images: ["/mount-arafat.jpg"],
-        createdAt: "2024-01-08",
-      },
-    ]
-
-    setPlaces(mockPlaces)
-    setLoading(false)
+    try {
+      const filters = selectedCity === "all" ? {} : { city: selectedCity }
+      const placesData = await placesAPI.getAll(filters)
+      setPlaces(placesData)
+    } catch (error) {
+      console.error("Failed to load places:", error)
+      alert(`Failed to load places: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
   }
-
-  const filteredPlaces = places.filter((place) => {
-    return selectedCity === "all" || place.city === selectedCity
-  })
 
   const handleAddPlace = () => {
     setEditingPlace(null)
@@ -78,9 +41,19 @@ const VisitPlaces = () => {
     setShowAddModal(true)
   }
 
-  const handleDeletePlace = (id) => {
+  const handleDeletePlace = async (id) => {
     if (window.confirm("Are you sure you want to delete this place?")) {
-      setPlaces(places.filter((place) => place.id !== id))
+      setDeleting(id)
+      try {
+        await placesAPI.delete(id)
+        setPlaces(places.filter((place) => place.id !== id))
+        alert("Place deleted successfully")
+      } catch (error) {
+        console.error("Failed to delete place:", error)
+        alert(`Failed to delete place: ${error.message}`)
+      } finally {
+        setDeleting(null)
+      }
     }
   }
 
@@ -120,7 +93,7 @@ const VisitPlaces = () => {
       </div>
 
       <div className="places-grid">
-        {filteredPlaces.map((place) => (
+        {places.map((place) => (
           <div key={place.id} className="place-card">
             <div className="place-image">
               <img src={place.images[0] || "/placeholder.svg"} alt={place.name} />
@@ -133,8 +106,8 @@ const VisitPlaces = () => {
                   <button className="action-btn edit" onClick={() => handleEditPlace(place)}>
                     ✏️
                   </button>
-                  <button className="action-btn delete" onClick={() => handleDeletePlace(place.id)}>
-                    🗑️
+                  <button className="action-btn delete" onClick={() => handleDeletePlace(place.id)} disabled={deleting === place.id}>
+                    {deleting === place.id ? "🗑️ Deleting..." : "🗑️"}
                   </button>
                 </div>
               </div>
@@ -177,24 +150,34 @@ const VisitPlaces = () => {
         <PlaceModal
           place={editingPlace}
           onClose={() => setShowAddModal(false)}
-          onSave={(placeData) => {
-            if (editingPlace) {
-              setPlaces(places.map((p) => (p.id === editingPlace.id ? { ...p, ...placeData } : p)))
-            } else {
-              setPlaces([
-                ...places,
-                { ...placeData, id: Date.now(), createdAt: new Date().toISOString().split("T")[0] },
-              ])
+          onSave={async (placeData) => {
+            setSaving(true)
+            try {
+              if (editingPlace) {
+                const updatedPlace = await placesAPI.update(editingPlace.id, placeData)
+                setPlaces(places.map((p) => (p.id === editingPlace.id ? updatedPlace : p)))
+                alert("Place updated successfully")
+              } else {
+                const newPlace = await placesAPI.create(placeData)
+                setPlaces([...places, newPlace])
+                alert("Place created successfully")
+              }
+              setShowAddModal(false)
+            } catch (error) {
+              console.error("Failed to save place:", error)
+              alert(`Failed to save place: ${error.message}`)
+            } finally {
+              setSaving(false)
             }
-            setShowAddModal(false)
           }}
+          saving={saving}
         />
       )}
     </div>
   )
 }
 
-const PlaceModal = ({ place, onClose, onSave }) => {
+const PlaceModal = ({ place, onClose, onSave, saving = false }) => {
   const [formData, setFormData] = useState({
     name: place?.name || "",
     description: {
@@ -365,11 +348,11 @@ const PlaceModal = ({ place, onClose, onSave }) => {
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
-              {place ? "Update Place" : "Add Place"}
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? "Saving..." : (place ? "Update Place" : "Add Place")}
             </button>
           </div>
         </form>
