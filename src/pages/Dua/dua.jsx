@@ -49,12 +49,15 @@ const Dua = () => {
 
   // Debug effect to check duas data
   useEffect(() => {
-    console.log('Duas data:', duas)
-    console.log('First dua:', duas[0])
+    console.log('=== DUAS DEBUG ===', new Date().toISOString());
+    console.log('Duas data:', duas);
+    console.log('Number of duas:', duas.length);
+    console.log('First dua:', duas[0]);
     if (duas[0]) {
-      console.log('First dua translation:', duas[0].translation)
-      console.log('Translation type:', typeof duas[0].translation)
-      console.log('Audio:', duas[0].audio)
+      console.log('First dua translation:', duas[0].translation);
+      console.log('Translation type:', typeof duas[0].translation);
+      console.log('Translation english:', duas[0].translation?.english);
+      console.log('Audio:', duas[0].audio);
     }
   }, [duas])
 
@@ -266,20 +269,22 @@ const Dua = () => {
 
               <div className="translations">
                 <div className="translation">
-                  <strong>English:</strong> {dua.translation.english}
+                  <strong>English:</strong> {dua.translation?.english || 'No translation'}
                 </div>
                 <div className="translation">
-                  <strong>Amharic:</strong> {dua.translation.amharic}
+                  <strong>Amharic:</strong> {dua.translation?.amharic || 'No translation'}
                 </div>
                 <div className="translation">
-                  <strong>Oromo:</strong> {dua.translation.oromo}
+                  <strong>Oromo:</strong> {dua.translation?.oromo || 'No translation'}
                 </div>
               </div>
-              <div className="audio-section">
-                <audio controls src={dua.audio} style={{ width: "100%", marginTop: "8px" }}>
-                  Your browser does not support the audio element.
-                </audio>
-              </div>
+              {dua.audio && (
+                <div className="audio-section">
+                  <audio controls src={dua.audio} style={{ width: "100%", marginTop: "8px" }}>
+                    Your browser does not support the audio element.
+                  </audio>
+                </div>
+              )}
             </div>
 
             <div className="dua-footer">

@@ -551,17 +551,32 @@ export const AppProvider = ({ children }) => {
   const refreshDuas = useCallback(async (filters = {}) => {
     try {
       const data = await duasAPI.getAll(filters);
+      console.log('Raw data from API:', data);
       // Ensure translation field is parsed as object if it's a string
-      const processedData = data.map(dua => ({
-        ...dua,
-        translation: typeof dua.translation === 'string' 
-          ? JSON.parse(dua.translation) 
-          : dua.translation,
-        // Ensure audio URLs are properly formatted
-        audio: dua.audio && !dua.audio.startsWith('http') 
-          ? `${API_BASE_URL}${dua.audio.startsWith('/') ? '' : '/'}${dua.audio}` 
-          : dua.audio
-      }));
+      const processedData = data.map(dua => {
+        const processedDua = {
+          ...dua,
+          translation: typeof dua.translation === 'string' 
+            ? (() => {
+                try {
+                  const parsed = JSON.parse(dua.translation);
+                  console.log('Successfully parsed translation for dua:', dua.id, parsed);
+                  return parsed;
+                } catch (e) {
+                  console.error('Failed to parse translation:', dua.translation, e);
+                  return { english: '', amharic: '', oromo: '' };
+                }
+              })()
+            : dua.translation,
+          // Ensure audio URLs are properly formatted
+          audio: dua.audio && !dua.audio.startsWith('http') 
+            ? `${API_BASE_URL}${dua.audio.startsWith('/') ? '' : '/'}${dua.audio}` 
+            : dua.audio
+        };
+        console.log('Processed dua:', processedDua.id, 'translation:', processedDua.translation, 'audio:', processedDua.audio);
+        return processedDua;
+      });
+      console.log('Final processed data:', processedData);
       setDuas(processedData);
       return processedData;
     } catch (error) {
