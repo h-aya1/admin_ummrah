@@ -273,11 +273,18 @@ const GuideModal = ({ guide, onClose, onSave }) => {
   const handleDeleteStep = async (stepId) => {
     if (window.confirm("Are you sure you want to delete this step?")) {
       try {
-        await stepsAPI.delete(stepId)
-        // Reload the guide to get updated steps
         if (guide) {
+          // Editing existing guide - use API
+          await stepsAPI.delete(stepId)
+          // Reload the guide to get updated steps
           const updatedGuide = await guidesAPI.getById(guide.id)
           setFormData(prev => ({ ...prev, steps: updatedGuide.steps || [] }))
+        } else {
+          // Creating new guide - manage steps locally
+          setFormData({
+            ...formData,
+            steps: formData.steps.filter(step => step.id !== stepId)
+          })
         }
       } catch (error) {
         console.error('Failed to delete step:', error)
@@ -286,17 +293,52 @@ const GuideModal = ({ guide, onClose, onSave }) => {
     }
   }
 
-  const handleSaveStep = async (stepData) => {
+  const handleSaveStep = async (stepData, stepFiles) => {
+    console.log('Guide exists:', !!guide);
     try {
-      if (editingStep) {
-        await stepsAPI.update(editingStep.id, stepData)
-      } else {
-        await stepsAPI.create(stepData)
-      }
-      // Reload the guide to get updated steps
       if (guide) {
+        // Editing existing guide - use API
+        if (editingStep) {
+          await stepsAPI.update(editingStep.id, stepData)
+        } else {
+          await stepsAPI.create(stepData)
+        }
+        // Reload the guide to get updated steps
         const updatedGuide = await guidesAPI.getById(guide.id)
         setFormData(prev => ({ ...prev, steps: updatedGuide.steps || [] }))
+      } else {
+        // Creating new guide - manage steps locally
+        // Extract data from FormData for local storage
+        const stepFormData = {
+          title: stepData.get('title'),
+          description: stepData.get('description'),
+          text: JSON.parse(stepData.get('text')),
+          arabic: stepData.get('arabic') || '',
+          duration: stepData.get('duration'),
+          location: stepData.get('location') || '',
+        }
+
+        if (editingStep) {
+          // Update existing step in local state
+          setFormData({
+            ...formData,
+            steps: formData.steps.map(step =>
+              step.id === editingStep.id ? { ...step, ...stepFormData, files: stepFiles } : step
+            )
+          })
+        } else {
+          // Add new step to local state
+          const newStep = {
+            ...stepFormData,
+            id: Date.now().toString(), // Temporary ID for local management
+            isLocal: true, // Flag to identify local steps
+            files: stepFiles // Store file objects for later upload
+          }
+          setFormData({
+            ...formData,
+            steps: [...formData.steps, newStep]
+          })
+        }
       }
       setShowStepModal(false)
     } catch (error) {
@@ -307,7 +349,7 @@ const GuideModal = ({ guide, onClose, onSave }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     const submitData = new FormData()
     submitData.append('title', formData.title)
     submitData.append('description', formData.description || '')
@@ -318,7 +360,51 @@ const GuideModal = ({ guide, onClose, onSave }) => {
     if (files.video) submitData.append('video', files.video)
     if (files.audio) submitData.append('audio', files.audio)
 
-    await onSave(submitData)
+    // For new guides with local steps, we need to handle this differently
+    if (!guide && formData.steps.some(step => step.isLocal)) {
+      try {
+        // Creating new guide with steps
+        console.log('Creating new guide with', formData.steps.filter(s => s.isLocal).length, 'local steps')
+        
+        // Create guide first
+        const newGuide = await guidesAPI.create(submitData)
+        const guideId = newGuide.id
+        console.log('Guide created with ID:', guideId)
+
+        // Create all local steps
+        for (const step of formData.steps) {
+          if (step.isLocal) {
+            console.log('Creating step:', step.title)
+            const stepData = new FormData()
+            stepData.append('title', step.title)
+            stepData.append('description', step.description)
+            stepData.append('text', JSON.stringify(step.text))
+            stepData.append('arabic', step.arabic || '')
+            stepData.append('duration', step.duration)
+            stepData.append('location', step.location || '')
+            stepData.append('guideId', guideId)
+
+            // Use stored files from local step
+            if (step.files?.image) stepData.append('image', step.files.image)
+            if (step.files?.video) stepData.append('video', step.files.video)
+            if (step.files?.audio) stepData.append('audio', step.files.audio)
+
+            await stepsAPI.create(stepData)
+            console.log('Step created successfully:', step.title)
+          }
+        }
+
+        // Use onSave callback to reload guides
+        await onSave(submitData)
+      } catch (error) {
+        console.error('Failed to save guide:', error)
+        console.error('Error details:', error.message, error.response?.data)
+        alert('Failed to save guide. Please try again.')
+      }
+    } else {
+      // Use the original onSave callback for simple cases
+      await onSave(submitData)
+    }
   }
 
   return (
@@ -496,6 +582,7 @@ const GuideModal = ({ guide, onClose, onSave }) => {
             onClose={() => setShowStepModal(false)}
             onSave={handleSaveStep}
             guideId={guide?.id}
+            initialFiles={editingStep?.files}
           />
         )}
       </div>
@@ -503,7 +590,7 @@ const GuideModal = ({ guide, onClose, onSave }) => {
   )
 }
 
-const StepModal = ({ step, onClose, onSave, guideId }) => {
+const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
   const [formData, setFormData] = useState({
     title: step?.title || "",
     description: step?.description || "",
@@ -517,9 +604,9 @@ const StepModal = ({ step, onClose, onSave, guideId }) => {
     location: step?.location || "",
   })
   const [files, setFiles] = useState({
-    image: null,
-    video: null,
-    audio: null,
+    image: initialFiles?.image || null,
+    video: initialFiles?.video || null,
+    audio: initialFiles?.audio || null,
   })
 
   const handleChange = (e) => {
@@ -556,13 +643,17 @@ const StepModal = ({ step, onClose, onSave, guideId }) => {
     submitData.append('arabic', formData.arabic || '')
     submitData.append('duration', formData.duration)
     submitData.append('location', formData.location || '')
-    submitData.append('guideId', guideId)
+    
+    // Only append guideId if it exists (for editing existing guides)
+    if (guideId) {
+      submitData.append('guideId', guideId)
+    }
 
     if (files.image) submitData.append('image', files.image)
     if (files.video) submitData.append('video', files.video)
     if (files.audio) submitData.append('audio', files.audio)
 
-    await onSave(submitData)
+    await onSave(submitData, files)
   }
 
   return (
