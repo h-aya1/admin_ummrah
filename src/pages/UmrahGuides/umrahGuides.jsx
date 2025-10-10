@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import "./umrahGuides.css"
+import { guidesAPI, stepsAPI } from "../../services/api"
 
 const UmrahGuides = () => {
   const [guides, setGuides] = useState([])
@@ -13,95 +14,16 @@ const UmrahGuides = () => {
   }, [])
 
   const loadGuides = async () => {
-    setLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    const mockGuides = [
-      {
-        id: 1,
-        title: "Entering Ihram",
-        description: "Complete guide for entering the state of Ihram",
-        translation: {
-          english: "Complete guide for entering the state of Ihram with step-by-step instructions",
-          amharic: "ወደ ኢህራም ሁኔታ ለመግባት ሙሉ መመሪያ ከደረጃ በደረጃ መመሪያዎች ጋር",
-          oromo: "Qajeelfama guutuu haala Ihram seenuuf tarkaanfii hunda waliin"
-        },
-        order: 1,
-        image: "ihram-guide-main.jpg",
-        video: "ihram-guide-video.mp4",
-        audio: "ihram-guide-audio.mp3",
-        steps: [
-          {
-            id: 1,
-            title: "Perform Ghusl",
-            description: "Take a full body bath with the intention of purification",
-            text: {
-              english: "Begin your Umrah journey by performing a complete ritual bath (Ghusl). This is an essential step for spiritual purification before entering the state of Ihram. Use clean water and make the intention for purification.",
-              amharic: "የኡምራህ ጉዞዎን በሙሉ የአካል መታጠብ (ጉስል) በማከናወን ይጀምሩ። ይህ ወደ ኢህራም ሁኔታ ከመግባት በፊት ለመንፈሳዊ ንጽሕና አስፈላጊ እርምጃ ነው። ንጹህ ውሃ ይጠቀሙ እና ለንጽሕና ዓላማ ያድርጉ።",
-              oromo: "Imala Umrah keessan eegaluuf dhiqannaa guutuu qaamaa (Ghusl) raawwachuun jalqabaa. Kun utuu haala Ihram seenuu dura qulqullinaa hafuuraa argachuuf tarkaanfii barbaachisaa dha. Bishaan qulqulluu fayyadamaa fi kaayyoo qulqullinaa godhadhaa."
-            },
-            arabic: "اغتسل بنية الطهارة",
-            image: "ghusl-guide.jpg",
-            audio: "ghusl-audio.mp3",
-            duration: "10-15 minutes",
-            location: "Before Miqat",
-          },
-          {
-            id: 2,
-            title: "Wear Ihram Clothing",
-            description: "Men wear two white unstitched cloths, women wear modest clothing",
-            text: {
-              english: "For men: Wear two white, unstitched pieces of cloth - one around the waist (Izar) and one over the shoulders (Rida). For women: Wear modest, loose-fitting clothing that covers the entire body except face and hands.",
-              amharic: "ለወንዶች፦ ሁለት ነጭ ያልተሰፉ ጨርቆችን ይልበሱ - አንዱ በወገብ ዙሪያ (ኢዛር) እና አንዱ በትከሻዎች ላይ (ሪዳ)። ለሴቶች፦ ከፊት እና ከእጅ በስተቀር አጠቃላይ ሰውነትን የሚሸፍን ትሑት፣ ልቅ ልብስ ይልበሱ።",
-              oromo: "Dhiiraaf: Huccuu adii lama kan hin hodhamne uffadhaa - tokko mudhii naannoo (Izar) fi tokko gatiittii irra (Rida). Dubartootaaf: Uffata salphaa, lallaafaa kan qaama guutuu fuula fi harka malee haguugu uffadhaa."
-            },
-            arabic: "البس ثياب الإحرام",
-            image: "ihram-clothing.jpg",
-            audio: null,
-            duration: "5 minutes",
-            location: "Before Miqat",
-          },
-        ],
-        createdAt: "2024-01-15",
-        updatedAt: "2024-01-20",
-      },
-      {
-        id: 2,
-        title: "Tawaf al-Umrah",
-        description: "Circumambulation around the Kaaba for Umrah",
-        translation: {
-          english: "Circumambulation around the Kaaba for Umrah with proper etiquette and duas",
-          amharic: "ለኡምራህ በካዕባ ዙሪያ መዞር ከተገቢው ሥነ-ምግባር እና ዱዓዎች ጋር",
-          oromo: "Kaaba naannoo Umrahf marsuu adaabii fi duaa sirrii waliin"
-        },
-        order: 2,
-        image: "tawaf-guide-main.jpg",
-        video: null,
-        audio: "tawaf-guide-audio.mp3",
-        steps: [
-          {
-            id: 1,
-            title: "Begin at Black Stone",
-            description: "Start your Tawaf by facing the Black Stone",
-            text: {
-              english: "Position yourself facing the Black Stone (Hajar al-Aswad). If possible, touch and kiss it. If the area is crowded, simply point towards it and say 'Bismillahi Allahu Akbar'. This marks the beginning of each round of Tawaf.",
-              amharic: "ወደ ጥቁር ድንጋይ (ሃጃር አል-አስዋድ) ፊትዎን ያዙሩ። በተቻለ መጠን ይንኩት እና ይሳሙት። አካባቢው ህዝብ የበዛበት ከሆነ፣ ወደ እሱ ብቻ ይጠቁሙ እና 'ቢስሚላሂ አላሁ አክባር' ይበሉ። ይህ የእያንዳንዱን የጣዋፍ ዙር መጀመሪያ ያመለክታል።",
-              oromo: "Dhagaa Gurraacha (Hajar al-Aswad) gara fuulduraatti of qopheessaa. Yoo danda'ame tuqaa fi dhungadhaa. Yoo naannoon sun namootaan guutame, gara isaatti qofa argisiisaa fi 'Bismillahi Allahu Akbar' jedhaa. Kun jalqaba marsaa Tawaf hundaa agarsiisa."
-            },
-            arabic: "ابدأ من الحجر الأسود",
-            image: "black-stone.jpg",
-            audio: "tawaf-dua.mp3",
-            duration: "1 minute",
-            location: "Masjid al-Haram",
-          },
-        ],
-        createdAt: "2024-01-10",
-        updatedAt: "2024-01-18",
-      },
-    ]
-
-    setGuides(mockGuides)
-    setLoading(false)
+    try {
+      setLoading(true)
+      const data = await guidesAPI.getAll()
+      setGuides(data || [])
+    } catch (error) {
+      console.error('Failed to load guides:', error)
+      // You might want to show an error message to the user here
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleAddGuide = () => {
@@ -114,9 +36,15 @@ const UmrahGuides = () => {
     setShowAddModal(true)
   }
 
-  const handleDeleteGuide = (id) => {
+  const handleDeleteGuide = async (id) => {
     if (window.confirm("Are you sure you want to delete this guide?")) {
-      setGuides(guides.filter((guide) => guide.id !== id))
+      try {
+        await guidesAPI.delete(id)
+        setGuides(guides.filter((guide) => guide.id !== id))
+      } catch (error) {
+        console.error('Failed to delete guide:', error)
+        alert('Failed to delete guide. Please try again.')
+      }
     }
   }
 
@@ -195,16 +123,19 @@ const UmrahGuides = () => {
         <GuideModal
           guide={editingGuide}
           onClose={() => setShowAddModal(false)}
-          onSave={(guideData) => {
-            if (editingGuide) {
-              setGuides(guides.map((g) => (g.id === editingGuide.id ? { ...g, ...guideData } : g)))
-            } else {
-              setGuides([
-                ...guides,
-                { ...guideData, id: Date.now(), createdAt: new Date().toISOString().split("T")[0] },
-              ])
+          onSave={async (guideData) => {
+            try {
+              if (editingGuide) {
+                await guidesAPI.update(editingGuide.id, guideData)
+              } else {
+                await guidesAPI.create(guideData)
+              }
+              await loadGuides() // Reload guides after save
+              setShowAddModal(false)
+            } catch (error) {
+              console.error('Failed to save guide:', error)
+              alert('Failed to save guide. Please try again.')
             }
-            setShowAddModal(false)
           }}
         />
       )}
@@ -288,15 +219,45 @@ const GuideDetailModal = ({ guide, onClose }) => {
 const GuideModal = ({ guide, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     title: guide?.title || "",
+    description: guide?.description || "",
     order: guide?.order || 1,
+    translation: {
+      english: guide?.translation?.english || "",
+      amharic: guide?.translation?.amharic || "",
+      oromo: guide?.translation?.oromo || "",
+    },
     steps: guide?.steps || [],
+  })
+  const [files, setFiles] = useState({
+    image: null,
+    video: null,
+    audio: null,
   })
   const [showStepModal, setShowStepModal] = useState(false)
   const [editingStep, setEditingStep] = useState(null)
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData({ ...formData, [name]: value })
+    if (name.startsWith("translation.")) {
+      const lang = name.split(".")[1]
+      setFormData({
+        ...formData,
+        translation: {
+          ...formData.translation,
+          [lang]: value,
+        },
+      })
+    } else {
+      setFormData({ ...formData, [name]: value })
+    }
+  }
+
+  const handleFileChange = (e) => {
+    const { name, files: fileList } = e.target
+    setFiles({
+      ...files,
+      [name]: fileList[0] || null,
+    })
   }
 
   const handleAddStep = () => {
@@ -309,33 +270,55 @@ const GuideModal = ({ guide, onClose, onSave }) => {
     setShowStepModal(true)
   }
 
-  const handleDeleteStep = (stepId) => {
-    setFormData({
-      ...formData,
-      steps: formData.steps.filter(step => step.id !== stepId)
-    })
-  }
-
-  const handleSaveStep = (stepData) => {
-    if (editingStep) {
-      setFormData({
-        ...formData,
-        steps: formData.steps.map(step => 
-          step.id === editingStep.id ? { ...step, ...stepData } : step
-        )
-      })
-    } else {
-      setFormData({
-        ...formData,
-        steps: [...formData.steps, { ...stepData, id: Date.now() }]
-      })
+  const handleDeleteStep = async (stepId) => {
+    if (window.confirm("Are you sure you want to delete this step?")) {
+      try {
+        await stepsAPI.delete(stepId)
+        // Reload the guide to get updated steps
+        if (guide) {
+          const updatedGuide = await guidesAPI.getById(guide.id)
+          setFormData(prev => ({ ...prev, steps: updatedGuide.steps || [] }))
+        }
+      } catch (error) {
+        console.error('Failed to delete step:', error)
+        alert('Failed to delete step. Please try again.')
+      }
     }
-    setShowStepModal(false)
   }
 
-  const handleSubmit = (e) => {
+  const handleSaveStep = async (stepData) => {
+    try {
+      if (editingStep) {
+        await stepsAPI.update(editingStep.id, stepData)
+      } else {
+        await stepsAPI.create(stepData)
+      }
+      // Reload the guide to get updated steps
+      if (guide) {
+        const updatedGuide = await guidesAPI.getById(guide.id)
+        setFormData(prev => ({ ...prev, steps: updatedGuide.steps || [] }))
+      }
+      setShowStepModal(false)
+    } catch (error) {
+      console.error('Failed to save step:', error)
+      alert('Failed to save step. Please try again.')
+    }
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    onSave(formData)
+    
+    const submitData = new FormData()
+    submitData.append('title', formData.title)
+    submitData.append('description', formData.description || '')
+    submitData.append('order', formData.order.toString())
+    submitData.append('translation', JSON.stringify(formData.translation))
+
+    if (files.image) submitData.append('image', files.image)
+    if (files.video) submitData.append('video', files.video)
+    if (files.audio) submitData.append('audio', files.audio)
+
+    await onSave(submitData)
   }
 
   return (
@@ -354,6 +337,18 @@ const GuideModal = ({ guide, onClose, onSave }) => {
             <input type="text" name="title" value={formData.title} onChange={handleChange} className="input" required />
           </div>
 
+          <div className="form-group">
+            <label>Description</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              className="input"
+              rows="3"
+              placeholder="Optional description..."
+            />
+          </div>
+
           <div className="form-row">
             <div className="form-group">
               <label>Order</label>
@@ -367,7 +362,93 @@ const GuideModal = ({ guide, onClose, onSave }) => {
                 required
               />
             </div>
+          </div>
 
+          <div className="translations-section">
+            <h3>Guide Translations</h3>
+            
+            <div className="form-group">
+              <label>English</label>
+              <textarea
+                name="translation.english"
+                value={formData.translation.english}
+                onChange={handleChange}
+                className="input"
+                rows="3"
+                placeholder="Guide description in English..."
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Amharic</label>
+              <textarea
+                name="translation.amharic"
+                value={formData.translation.amharic}
+                onChange={handleChange}
+                className="input"
+                rows="3"
+                placeholder="Guide description in Amharic..."
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Oromo</label>
+              <textarea
+                name="translation.oromo"
+                value={formData.translation.oromo}
+                onChange={handleChange}
+                className="input"
+                rows="3"
+                placeholder="Guide description in Oromo..."
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Image</label>
+            <input 
+              type="file" 
+              name="image" 
+              accept="image/*" 
+              onChange={handleFileChange} 
+              className="input" 
+            />
+            {guide?.image && !files.image && (
+              <div className="current-file">
+                Current: <img src={`http://localhost:3000/${guide.image}`} alt="Current" style={{ width: "100px", marginTop: "8px" }} />
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label>Video (Optional)</label>
+            <input 
+              type="file" 
+              name="video" 
+              accept="video/*" 
+              onChange={handleFileChange} 
+              className="input" 
+            />
+            {guide?.video && !files.video && (
+              <div className="current-file">Current video: {guide.video}</div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label>Audio (Optional)</label>
+            <input 
+              type="file" 
+              name="audio" 
+              accept="audio/*" 
+              onChange={handleFileChange} 
+              className="input" 
+            />
+            {guide?.audio && !files.audio && (
+              <div className="current-file">Current audio: {guide.audio}</div>
+            )}
           </div>
 
           <div className="form-group">
@@ -414,6 +495,7 @@ const GuideModal = ({ guide, onClose, onSave }) => {
             step={editingStep}
             onClose={() => setShowStepModal(false)}
             onSave={handleSaveStep}
+            guideId={guide?.id}
           />
         )}
       </div>
@@ -421,7 +503,7 @@ const GuideModal = ({ guide, onClose, onSave }) => {
   )
 }
 
-const StepModal = ({ step, onClose, onSave }) => {
+const StepModal = ({ step, onClose, onSave, guideId }) => {
   const [formData, setFormData] = useState({
     title: step?.title || "",
     description: step?.description || "",
@@ -431,22 +513,18 @@ const StepModal = ({ step, onClose, onSave }) => {
       oromo: step?.text?.oromo || "",
     },
     arabic: step?.arabic || "",
-    image: step?.image || "",
-    audio: step?.audio || "",
-    video: step?.video || "",
     duration: step?.duration || "",
     location: step?.location || "",
   })
+  const [files, setFiles] = useState({
+    image: null,
+    video: null,
+    audio: null,
+  })
 
   const handleChange = (e) => {
-    const { name, value, files } = e.target
-    if (name === "image" && files && files[0]) {
-      setFormData({ ...formData, image: URL.createObjectURL(files[0]) })
-    } else if (name === "audio" && files && files[0]) {
-      setFormData({ ...formData, audio: URL.createObjectURL(files[0]) })
-    } else if (name === "video" && files && files[0]) {
-      setFormData({ ...formData, video: URL.createObjectURL(files[0]) })
-    } else if (name.startsWith("text.")) {
+    const { name, value } = e.target
+    if (name.startsWith("text.")) {
       const lang = name.split(".")[1]
       setFormData({
         ...formData,
@@ -460,9 +538,31 @@ const StepModal = ({ step, onClose, onSave }) => {
     }
   }
 
-  const handleSubmit = (e) => {
+  const handleFileChange = (e) => {
+    const { name, files: fileList } = e.target
+    setFiles({
+      ...files,
+      [name]: fileList[0] || null,
+    })
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    onSave(formData)
+    
+    const submitData = new FormData()
+    submitData.append('title', formData.title)
+    submitData.append('description', formData.description)
+    submitData.append('text', JSON.stringify(formData.text))
+    submitData.append('arabic', formData.arabic || '')
+    submitData.append('duration', formData.duration)
+    submitData.append('location', formData.location || '')
+    submitData.append('guideId', guideId)
+
+    if (files.image) submitData.append('image', files.image)
+    if (files.video) submitData.append('video', files.video)
+    if (files.audio) submitData.append('audio', files.audio)
+
+    await onSave(submitData)
   }
 
   return (
@@ -561,17 +661,13 @@ const StepModal = ({ step, onClose, onSave }) => {
               type="file" 
               name="image" 
               accept="image/*" 
-              onChange={handleChange} 
+              onChange={handleFileChange} 
               className="input" 
               required 
             />
-            {formData.image && (
-              <div className="image-preview">
-                <img 
-                  src={formData.image} 
-                  alt="Preview" 
-                  style={{ width: "100%", maxWidth: "200px", borderRadius: "8px", marginTop: "8px" }} 
-                />
+            {step?.image && !files.image && (
+              <div className="current-file">
+                Current: <img src={`http://localhost:3000/${step.image}`} alt="Current" style={{ width: "100px", marginTop: "8px" }} />
               </div>
             )}
           </div>
@@ -582,11 +678,11 @@ const StepModal = ({ step, onClose, onSave }) => {
               type="file" 
               name="video" 
               accept="video/*" 
-              onChange={handleChange} 
+              onChange={handleFileChange} 
               className="input" 
             />
-            {formData.video && (
-              <video controls src={formData.video} style={{ width: "100%", maxWidth: "300px", borderRadius: "8px", marginTop: "8px" }} />
+            {step?.video && !files.video && (
+              <div className="current-file">Current video: {step.video}</div>
             )}
           </div>
 
@@ -596,13 +692,11 @@ const StepModal = ({ step, onClose, onSave }) => {
               type="file" 
               name="audio" 
               accept="audio/*" 
-              onChange={handleChange} 
+              onChange={handleFileChange} 
               className="input" 
             />
-            {formData.audio && (
-              <audio controls src={formData.audio} style={{ width: "100%", marginTop: "8px" }}>
-                Your browser does not support the audio element.
-              </audio>
+            {step?.audio && !files.audio && (
+              <div className="current-file">Current audio: {step.audio}</div>
             )}
           </div>
 

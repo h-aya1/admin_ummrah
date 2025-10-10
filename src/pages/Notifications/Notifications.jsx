@@ -1,75 +1,78 @@
 import { useState, useEffect } from "react"
+import "./Notifications.css"
+import { notificationsAPI } from "../../services/api"
+import { useAppContext } from "../../contexts/AppContext"
 
 const Notifications = () => {
+  const { users, isAuthenticated } = useAppContext()
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [showSendModal, setShowSendModal] = useState(false)
 
   useEffect(() => {
-    loadNotifications()
-  }, [])
+    if (isAuthenticated) {
+      loadNotifications()
+    } else {
+      setLoading(false)
+    }
+  }, [isAuthenticated])
 
   const loadNotifications = async () => {
     setLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    const mockNotifications = [
-      {
-        id: 1,
-        title: "Prayer Time Reminder",
-        message: "Maghrib prayer time is approaching in 15 minutes",
-        type: "prayer",
-        recipients: "all",
-        sentAt: new Date(Date.now() - 30 * 60000),
-        status: "sent",
-        readCount: 156,
-        totalRecipients: 200,
-      },
-      {
-        id: 2,
-        title: "Weather Alert",
-        message: "High temperature expected today. Please stay hydrated and seek shade.",
-        type: "weather",
-        recipients: "Makkah Groups",
-        sentAt: new Date(Date.now() - 2 * 60 * 60000),
-        status: "sent",
-        readCount: 89,
-        totalRecipients: 120,
-      },
-      {
-        id: 3,
-        title: "Group Meeting",
-        message: "All group leaders meeting at 8 PM in the main hall",
-        type: "announcement",
-        recipients: "amirs",
-        sentAt: new Date(Date.now() - 4 * 60 * 60000),
-        status: "sent",
-        readCount: 23,
-        totalRecipients: 25,
-      },
-    ]
-
-    setNotifications(mockNotifications)
-    setLoading(false)
-  }
-
-  const handleSendNotification = (notificationData) => {
-    const newNotification = {
-      id: Date.now(),
-      ...notificationData,
-      sentAt: new Date(),
-      status: "sent",
-      readCount: 0,
-      totalRecipients: notificationData.recipients === "all" ? 200 : 50,
+    try {
+      const data = await notificationsAPI.getAll()
+      setNotifications(data || [])
+    } catch (error) {
+      console.error('Error loading notifications:', error)
+      setNotifications([])
+    } finally {
+      setLoading(false)
     }
-    setNotifications([newNotification, ...notifications])
-    setShowSendModal(false)
   }
 
-  const handleDeleteNotification = (id) => {
+  const handleSendNotification = async (notificationData) => {
+    if (!isAuthenticated) {
+      alert('You must be logged in to send notifications.')
+      return
+    }
+    try {
+      await notificationsAPI.create(notificationData)
+      setShowSendModal(false)
+      // Refresh the notifications list
+      await loadNotifications()
+    } catch (error) {
+      console.error('Error sending notification:', error)
+      alert('Failed to send notification. Please try again.')
+    }
+  }
+
+  const handleDeleteNotification = async (id) => {
+    if (!isAuthenticated) {
+      alert('You must be logged in to delete notifications.')
+      return
+    }
     if (window.confirm("Are you sure you want to delete this notification?")) {
-      setNotifications(notifications.filter((notif) => notif.id !== id))
+      try {
+        await notificationsAPI.delete(id)
+        // Refresh the notifications list
+        await loadNotifications()
+      } catch (error) {
+        console.error('Error deleting notification:', error)
+        alert('Failed to delete notification. Please try again.')
+      }
     }
+  }
+
+  // Show message if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="notifications-page">
+        <div className="notifications-loading">
+          <div className="loading-spinner"></div>
+          <p>Please log in to access notifications</p>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -115,7 +118,7 @@ const Notifications = () => {
                 <strong>Recipients:</strong> {notification.recipients}
               </div>
               <div className="meta-item">
-                <strong>Sent:</strong> {notification.sentAt.toLocaleString()}
+                <strong>Sent:</strong> {new Date(notification.createdAt || notification.sentAt).toLocaleString()}
               </div>
               <div className="meta-item">
                 <strong>Read Rate:</strong> {notification.readCount}/{notification.totalRecipients} (
@@ -139,13 +142,13 @@ const Notifications = () => {
       </div>
 
       {showSendModal && (
-        <SendNotificationModal onClose={() => setShowSendModal(false)} onSend={handleSendNotification} />
+        <SendNotificationModal onClose={() => setShowSendModal(false)} onSend={handleSendNotification} users={users} />
       )}
     </div>
   )
 }
 
-const SendNotificationModal = ({ onClose, onSend }) => {
+const SendNotificationModal = ({ onClose, onSend, users }) => {
   const [formData, setFormData] = useState({
     title: "",
     message: "",
@@ -205,13 +208,29 @@ const SendNotificationModal = ({ onClose, onSend }) => {
             <div className="form-group">
               <label>Recipients</label>
               <select name="recipients" value={formData.recipients} onChange={handleChange} className="input">
-                <option value="all">All Pilgrims</option>
-                <option value="amirs">Group Leaders Only</option>
-                <option value="Makkah Groups">Makkah Groups</option>
-                <option value="Medina Groups">Medina Groups</option>
+                <option value="all">All pilgrims</option>
+                <option value="amirs">List of amirs</option>
+                <option value="Makkah Groups">Group chats</option>
               </select>
             </div>
           </div>
+
+          {formData.recipients === "amirs" && users && (
+            <div className="form-group">
+              <label>Registered Amirs ({users.filter(user => user.role === "amir").length})</label>
+              <div className="amirs-list">
+                {users.filter(user => user.role === "amir").map((amir) => (
+                  <div key={amir.id} className="amir-item">
+                    <span className="amir-name">{amir.name}</span>
+                    <span className="amir-phone">{amir.phone || "No phone"}</span>
+                  </div>
+                ))}
+                {users.filter(user => user.role === "amir").length === 0 && (
+                  <p className="no-amirs">No registered amirs found</p>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose}>

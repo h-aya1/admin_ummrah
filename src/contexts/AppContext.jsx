@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { authAPI, usersAPI, groupsAPI, duasAPI } from "../services/api"
+// Firebase imports for push notifications
+import { requestForToken, onMessageListener } from "../firebase"
 
 const API_BASE_URL = 'http://localhost:3000'; // Should match the one in api.js
 
@@ -96,6 +98,7 @@ export const AppProvider = ({ children }) => {
   })
   const [recentActivities, setRecentActivities] = useState([])
   const [currentPage, setCurrentPage] = useState("Dashboard")
+  const [fcmToken, setFcmToken] = useState(null)
   const [userPasswords, setUserPasswords] = useState(() => {
     try {
       const stored = localStorage.getItem(PASSWORD_STORE_KEY)
@@ -186,6 +189,20 @@ export const AppProvider = ({ children }) => {
 
       setIsAuthenticated(true);
       setUser(userData);
+
+      // Request FCM token for push notifications after successful login
+      try {
+        const token = await requestForToken();
+        if (token) {
+          setFcmToken(token);
+          console.log('FCM Token obtained:', token);
+          // TODO: Send this token to your backend via API call
+          // Example: await fetch('/api/admin/fcm-token', { method: 'POST', body: JSON.stringify({ token, userId: userData.id }) });
+        }
+      } catch (error) {
+        console.error('Failed to get FCM token:', error);
+      }
+
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message || "Login failed" };
@@ -275,6 +292,31 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     usersRef.current = users;
   }, [users])
+
+  // Set up FCM foreground message listener when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      const unsubscribe = onMessageListener((payload) => {
+        console.log('Foreground message received:', payload);
+
+        // Display alert with notification content
+        const title = payload?.notification?.title || 'Umrah Admin Notification';
+        const body = payload?.notification?.body || 'You have a new notification';
+
+        alert(`${title}\n\n${body}`);
+
+        // You can also add the notification to your app's notification system
+        // addNotification({
+        //   type: 'push',
+        //   title,
+        //   message: body,
+        //   priority: 'high'
+        // });
+      });
+
+      return unsubscribe; // Cleanup listener on unmount or when authentication changes
+    }
+  }, [isAuthenticated]);
 
   // User management functions
   const addUser = async (userData) => {
@@ -675,6 +717,7 @@ export const AppProvider = ({ children }) => {
       stats,
       recentActivities,
       currentPage,
+      fcmToken,
       users,
       groups,
       messages,
@@ -705,7 +748,7 @@ export const AppProvider = ({ children }) => {
       updateDua,
       deleteDua,
     }),
-    [isAuthenticated, user, sidebarCollapsed, notifications, stats, recentActivities, currentPage, users, groups, messages, duas, duaCategories, login, logout, toggleSidebar, addNotification, removeNotification, addActivity, updateCurrentPage, addUser, updateUser, deleteUser, addGroup, updateGroup, deleteGroup, refreshUsers, refreshGroups, assignUserToGroup, removeUserFromGroup, addMessage, updateStats, refreshDuas, refreshDuaCategories, addDua, updateDua, deleteDua]
+    [isAuthenticated, user, sidebarCollapsed, notifications, stats, recentActivities, currentPage, fcmToken, users, groups, messages, duas, duaCategories, login, logout, toggleSidebar, addNotification, removeNotification, addActivity, updateCurrentPage, addUser, updateUser, deleteUser, addGroup, updateGroup, deleteGroup, refreshUsers, refreshGroups, assignUserToGroup, removeUserFromGroup, addMessage, updateStats, refreshDuas, refreshDuaCategories, addDua, updateDua, deleteDua]
   )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

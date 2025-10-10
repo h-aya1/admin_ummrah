@@ -225,20 +225,62 @@ export const placesAPI = {
 
 export const guidesAPI = {
   async getAll() {
-    await delay(300);
-    return { data: [] };
+    return apiCall('/guides');
   },
-  async create(payload) {
-    await delay(200);
-    return { data: { id: Math.random().toString(36).slice(2), ...payload } };
+
+  async getById(id) {
+    return apiCall(`/guides/${id}`);
   },
-  async update(id, payload) {
-    await delay(200);
-    return { data: { id, ...payload } };
+
+  async create(formData) {
+    return apiCallWithFiles('/guides', {
+      method: 'POST',
+      body: formData,
+    });
   },
-  async delete() {
-    await delay(150);
-    return { ok: true };
+
+  async update(id, formData) {
+    return apiCallWithFiles(`/guides/${id}`, {
+      method: 'PUT',
+      body: formData,
+    });
+  },
+
+  async delete(id) {
+    return apiCall(`/guides/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+export const stepsAPI = {
+  async getAll(guideId = null) {
+    const query = guideId ? `?guideId=${guideId}` : '';
+    return apiCall(`/guides/steps${query}`);
+  },
+
+  async getById(id) {
+    return apiCall(`/guides/steps/${id}`);
+  },
+
+  async create(formData) {
+    return apiCallWithFiles('/guides/steps', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  async update(id, formData) {
+    return apiCallWithFiles(`/guides/steps/${id}`, {
+      method: 'PUT',
+      body: formData,
+    });
+  },
+
+  async delete(id) {
+    return apiCall(`/guides/steps/${id}`, {
+      method: 'DELETE',
+    });
   },
 };
 
@@ -249,4 +291,21 @@ export const analyticsAPI = {
   }
 };
 
+export const notificationsAPI = {
+  async getAll() {
+    return apiCall('/notifications'); // GET all notifications
+  },
 
+  async create(payload) {
+    return apiCall('/notifications', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async delete(id) {
+    return apiCall(`/notifications/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
