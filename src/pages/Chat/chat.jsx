@@ -148,7 +148,7 @@ const Chat = () => {
     
     // Check if user has permission to send messages
     if (!canSendMessage()) {
-      alert('Only admin and group leaders (amir) can send messages. Regular members can only view messages.')
+      alert('Only admin and group leaders (amir) can send messages. Regular pilgrims can only view messages.')
       return
     }
     
@@ -237,7 +237,7 @@ const Chat = () => {
   
   const canSendMessage = () => {
     // Only admin and group leaders (amir) can send messages
-    // Members cannot send messages at all
+    // Pilgrims cannot send messages at all
     return currentUser.role === 'admin' || 
            (currentUser.role === 'amir' && selectedGroup?.amir === currentUser.name)
   }

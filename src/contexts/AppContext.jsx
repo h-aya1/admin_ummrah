@@ -327,7 +327,7 @@ export const AppProvider = ({ children }) => {
         name: userData?.name?.trim(),
         email: userData?.email?.trim(),
         phone: userData?.phone?.trim(),
-        role: userData?.role || "member",
+        role: userData?.role || "pilgrim",
         emergencyContact: userData?.emergencyContact?.trim(),
         password,
       };
@@ -520,7 +520,7 @@ export const AppProvider = ({ children }) => {
       const updatedGroup = refreshedGroups.find((g) => g.id === groupId) || group;
 
       addActivity({
-        type: "member_added",
+        type: "pilgrim_added",
         message: `Added ${userObj.name} to ${updatedGroup.name}`,
         icon: "➕",
       })
@@ -557,7 +557,7 @@ export const AppProvider = ({ children }) => {
       const updatedGroup = refreshedGroups.find((g) => g.id === groupId) || group;
 
       addActivity({
-        type: "member_removed",
+        type: "pilgrim_removed",
         message: `Removed ${userObj?.name || "User"} from ${group.name}`,
         icon: "➖",
       })

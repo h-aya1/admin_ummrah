@@ -83,7 +83,7 @@ const ManageGroups = () => {
     try {
       const updated = await assignUserToGroup(userId, groupId)
       setSelectedGroup(updated)
-      setToastMsg('Member added to group')
+      setToastMsg('Pilgrim added to group')
     } catch (err) {
       setToastMsg(err.message || 'Failed to assign user to group')
     }
@@ -93,9 +93,9 @@ const ManageGroups = () => {
     try {
       const updated = await removeUserFromGroup(userId, groupId)
       setSelectedGroup(updated)
-      setToastMsg('Member removed from group')
+      setToastMsg('Pilgrim removed from group')
     } catch (err) {
-      setToastMsg(err.message || 'Failed to remove member')
+      setToastMsg(err.message || 'Failed to remove pilgrim')
     }
   }
 
@@ -388,7 +388,7 @@ const AddMemberSection = ({ group, users, onAssignUser }) => {
       await onAssignUser(user.id, group.id)
       setToastMsg(`${user.name} added to ${group.name}`)
     } catch (err) {
-      setToastMsg(err.message || 'Failed to add member')
+      setToastMsg(err.message || 'Failed to add pilgrim')
     } finally {
       setBusy(false)
     }
@@ -396,7 +396,7 @@ const AddMemberSection = ({ group, users, onAssignUser }) => {
 
   return (
     <div className="add-member-section">
-      <h4 className="add-member-title">Add Member</h4>
+      <h4 className="add-member-title">Add Pilgrim</h4>
       {available.length === 0 ? (
         <div className="no-users-message">No available users to add</div>
       ) : (
@@ -412,7 +412,7 @@ const AddMemberSection = ({ group, users, onAssignUser }) => {
             ))}
           </select>
           <button className="btn btn-primary add-member-btn" onClick={handleAdd} disabled={busy}>
-            Add Member
+            Add Pilgrim
           </button>
         </div>
       )}
@@ -493,7 +493,7 @@ const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignU
                   <button
                     className="btn btn-danger"
                     style={{ marginLeft: 12 }}
-                    title="Remove member"
+                    title="Remove pilgrim"
                     onClick={() => handleRemoveMember(member.id)}
                   >
                     Remove
@@ -524,7 +524,7 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
           name: item?.name || "",
           phone: item?.phone || "",
           email: item?.email || "",
-          role: item?.role || "member",
+          role: item?.role || "pilgrim",
           emergencyContact: item?.emergencyContact || "",
         },
   )
@@ -652,7 +652,7 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
               <div className="form-group">
                 <label>Role</label>
                 <select name="role" value={formData.role} onChange={handleChange} className="input">
-                  <option value="member">Member</option>
+                  <option value="pilgrim">Pilgrim</option>
                   <option value="amir">Amir</option>
                 </select>
               </div>

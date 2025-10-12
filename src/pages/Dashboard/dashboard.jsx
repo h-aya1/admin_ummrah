@@ -38,7 +38,7 @@ const Dashboard = () => {
             name: "Fatima Ali",
             email: "fatima@example.com",
             phone: "+966507654321",
-            role: "member",
+            role: "pilgrim",
             groupId: 1,
             groupName: "Makkah-2024",
             joinedAt: "2024-01-16",
@@ -70,7 +70,7 @@ const Dashboard = () => {
                 id: 2,
                 name: "Fatima Ali",
                 phone: "+966507654321",
-                role: "member",
+                role: "pilgrim",
                 joinedAt: "2024-01-16"
               }
             ],

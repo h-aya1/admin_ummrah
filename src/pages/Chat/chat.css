@@ -576,7 +576,7 @@
   background-color: var(--warning);
 }
 
-.role-indicator.member {
+.role-indicator.pilgrim {
   background-color: var(--success);
 }
 
@@ -615,7 +615,7 @@
   color: var(--warning);
 }
 
-.sender-role.member {
+.sender-role.pilgrim {
   background-color: rgba(16, 185, 129, 0.2);
   color: var(--success);
 }
