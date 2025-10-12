@@ -1,5 +1,5 @@
 // API service with authentication
-const API_BASE_URL = 'http://localhost:3000'; // Adjust if needed
+const API_BASE_URL = 'http://69.62.109.18:3001'; // Adjust if needed
 
 // Helper to get auth headers
 const getAuthHeaders = () => {
