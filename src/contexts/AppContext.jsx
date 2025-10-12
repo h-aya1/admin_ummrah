@@ -3,7 +3,7 @@ import { authAPI, usersAPI, groupsAPI, duasAPI } from "../services/api"
 // Firebase imports for push notifications
 import { requestForToken, onMessageListener } from "../firebase"
 
-const API_BASE_URL = 'http://localhost:3000'; // Should match the one in api.js
+const API_BASE_URL = 'http://69.62.109.18:3001'; // Should match the one in api.js
 
 const generateRandomPassword = (length = 10) => {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@$!%*?&"
