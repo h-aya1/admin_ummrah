@@ -171,7 +171,7 @@ const Chat = () => {
       await new Promise(resolve => setTimeout(resolve, 500))
       
       // In production, make actual API call:
-      /*
+  
       const response = await fetch('/api/messages', {
         method: 'POST',
         headers: {
@@ -186,7 +186,6 @@ const Chat = () => {
       }
       
       const result = await response.json()
-      */
       
       // Mock successful response
       const newMessage = {
