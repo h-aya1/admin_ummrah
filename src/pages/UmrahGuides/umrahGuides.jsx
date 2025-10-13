@@ -795,7 +795,8 @@ const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
               name="image" 
               accept="image/*" 
               onChange={handleFileChange} 
-              className="input" 
+              className="input"
+              required 
             />
             {step?.image && !files.image && (
               <div className="current-file">
