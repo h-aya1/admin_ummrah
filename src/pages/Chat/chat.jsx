@@ -107,7 +107,7 @@ const Chat = () => {
       })
       
       // In production, add these event listeners:
-      /*
+
       ws.addEventListener('message', (event) => {
         const messageData = JSON.parse(event.data)
         handleNewMessage(messageData)
@@ -122,7 +122,7 @@ const Chat = () => {
         console.log('WebSocket connection closed')
         setConnectionStatus('disconnected')
       })
-      */
+
       
     } catch (error) {
       console.error('Failed to connect to chat:', error)
