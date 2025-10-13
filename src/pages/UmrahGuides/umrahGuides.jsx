@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import "./umrahGuides.css"
 import { guidesAPI, stepsAPI } from "../../services/api"
 
@@ -144,8 +144,24 @@ const UmrahGuides = () => {
 }
 
 const GuideDetailModal = ({ guide, onClose }) => {
+  const modalRef = useRef(null)
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modalRef.current && event.target === modalRef.current) {
+        onClose()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [onClose])
+
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" ref={modalRef}>
       <div className="modal-content large">
         <div className="modal-header">
           <h2>{guide.title}</h2>
@@ -217,6 +233,7 @@ const GuideDetailModal = ({ guide, onClose }) => {
 }
 
 const GuideModal = ({ guide, onClose, onSave }) => {
+  const modalRef = useRef(null)
   const [formData, setFormData] = useState({
     title: guide?.title || "",
     description: guide?.description || "",
@@ -235,6 +252,20 @@ const GuideModal = ({ guide, onClose, onSave }) => {
   })
   const [showStepModal, setShowStepModal] = useState(false)
   const [editingStep, setEditingStep] = useState(null)
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modalRef.current && event.target === modalRef.current) {
+        onClose()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [onClose])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -408,7 +439,7 @@ const GuideModal = ({ guide, onClose, onSave }) => {
   }
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" ref={modalRef}>
       <div className="modal-content">
         <div className="modal-header">
           <h2>{guide ? "Edit Guide" : "Add New Guide"}</h2>
@@ -591,6 +622,7 @@ const GuideModal = ({ guide, onClose, onSave }) => {
 }
 
 const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
+  const modalRef = useRef(null)
   const [formData, setFormData] = useState({
     title: step?.title || "",
     description: step?.description || "",
@@ -608,6 +640,20 @@ const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
     video: initialFiles?.video || null,
     audio: initialFiles?.audio || null,
   })
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modalRef.current && event.target === modalRef.current) {
+        onClose()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [onClose])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -657,7 +703,7 @@ const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
   }
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" ref={modalRef}>
       <div className="modal-content">
         <div className="modal-header">
           <h2>{step ? "Edit Step" : "Add New Step"}</h2>

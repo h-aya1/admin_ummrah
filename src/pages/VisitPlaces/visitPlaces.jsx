@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import "./visitPlaces.css"
 import { placesAPI } from "../../services/api"
 
@@ -178,6 +178,7 @@ const VisitPlaces = () => {
 }
 
 const PlaceModal = ({ place, onClose, onSave, saving = false }) => {
+  const modalRef = useRef(null)
   const [formData, setFormData] = useState({
     name: place?.name || "",
     description: {
@@ -189,6 +190,20 @@ const PlaceModal = ({ place, onClose, onSave, saving = false }) => {
     mapLocation: place?.mapLocation || "",
     images: place?.images || [],
   })
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modalRef.current && event.target === modalRef.current) {
+        onClose()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [onClose])
 
   const handleChange = (e) => {
     const { name, value, files } = e.target
@@ -222,7 +237,7 @@ const PlaceModal = ({ place, onClose, onSave, saving = false }) => {
   }
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" ref={modalRef}>
       <div className="modal-content">
         <div className="modal-header">
           <h2>{place ? "Edit Place" : "Add New Place"}</h2>

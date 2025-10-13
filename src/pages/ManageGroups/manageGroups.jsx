@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useAppContext } from "../../contexts/AppContext"
 import "./manageGroups.css"
 
@@ -192,8 +192,8 @@ const ManageGroups = () => {
       )}
 
       {newUserPassword && (
-        <div className="modal-overlay">
-          <div className="modal-content">
+        <div className="modal-overlay" onClick={() => setNewUserPassword("")}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>User Password Generated</h2>
               <button className="close-btn" onClick={() => setNewUserPassword("")}>×</button>
@@ -427,6 +427,21 @@ const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignU
   const lastActivity = group?.lastActivity ? new Date(group.lastActivity).toLocaleString() : "N/A"
   const activeMembers = typeof group?.activeMembers === 'number' ? group.activeMembers : 0
   const offlineMembers = Math.max(0, totalMembers - activeMembers)
+  const modalRef = useRef(null)
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modalRef.current && event.target === modalRef.current) {
+        onClose()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [onClose])
 
   // Remove member handler (backend)
   const handleRemoveMember = async (memberId) => {
@@ -436,7 +451,7 @@ const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignU
   }
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" ref={modalRef}>
       <div className="modal-content large">
         <div className="modal-header">
           <h2>{group?.name || "Group Details"}</h2>
@@ -514,6 +529,7 @@ const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignU
 const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
   // Ensure users is always defined
   users = users || []
+  const modalRef = useRef(null)
   const [formData, setFormData] = useState(
     type === "group"
       ? {
@@ -530,6 +546,20 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
   )
   // Only users with role 'amir' for group leader selection
   const amirUsers = users.filter(u => u.role === "amir")
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modalRef.current && event.target === modalRef.current) {
+        onClose()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [onClose])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -563,7 +593,7 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
   }
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" ref={modalRef}>
       <div className="modal-content">
         <div className="modal-header">
           <h2>

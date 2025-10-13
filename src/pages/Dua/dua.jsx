@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useAppContext } from "../../contexts/AppContext"
 import "./dua.css"
 
@@ -331,6 +331,7 @@ const Dua = () => {
 }
 
 const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
+  const modalRef = useRef(null)
   const [formData, setFormData] = useState({
     title: dua?.title || "",
     arabic: dua?.arabic || "",
@@ -343,6 +344,20 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
     audio: dua?.audio || "",
   })
   const [audioFile, setAudioFile] = useState(null) // Store the actual file
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modalRef.current && event.target === modalRef.current) {
+        onClose()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [onClose])
 
   const handleChange = (e) => {
     const { name, value, files } = e.target
@@ -376,7 +391,7 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
   }
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" ref={modalRef}>
       <div className="modal-content">
         <div className="modal-header">
           <h2>{dua ? "Edit Dua" : "Add New Dua"}</h2>
@@ -489,9 +504,24 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
 }
 
 const CategoryModal = ({ categories = [], onClose, onAddCategory, onDeleteCategory, onRenameCategory }) => {
+  const modalRef = useRef(null)
   const [newName, setNewName] = useState("")
   const [editing, setEditing] = useState(null) // category name being edited
   const [editValue, setEditValue] = useState("")
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modalRef.current && event.target === modalRef.current) {
+        onClose()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [onClose])
 
   const startEdit = (name) => {
     setEditing(name)
@@ -506,7 +536,7 @@ const CategoryModal = ({ categories = [], onClose, onAddCategory, onDeleteCatego
   }
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" ref={modalRef}>
       <div className="modal-content">
         <div className="modal-header">
           <h2>Manage Categories</h2>

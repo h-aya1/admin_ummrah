@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import "./Notifications.css"
 import { notificationsAPI } from "../../services/api"
 import { useAppContext } from "../../contexts/AppContext"
@@ -149,12 +149,27 @@ const Notifications = () => {
 }
 
 const SendNotificationModal = ({ onClose, onSend, users }) => {
+  const modalRef = useRef(null)
   const [formData, setFormData] = useState({
     title: "",
     message: "",
     type: "announcement",
     recipients: "all",
   })
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modalRef.current && event.target === modalRef.current) {
+        onClose()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [onClose])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -167,7 +182,7 @@ const SendNotificationModal = ({ onClose, onSend, users }) => {
   }
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" ref={modalRef}>
       <div className="modal-content">
         <div className="modal-header">
           <h2>Send Notification</h2>
