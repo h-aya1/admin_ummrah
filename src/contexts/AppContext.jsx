@@ -593,7 +593,6 @@ export const AppProvider = ({ children }) => {
   const refreshDuas = useCallback(async (filters = {}) => {
     try {
       const data = await duasAPI.getAll(filters);
-      console.log('Raw data from API:', data);
       // Ensure translation field is parsed as object if it's a string
       const processedData = data.map(dua => {
         const processedDua = {
@@ -601,9 +600,7 @@ export const AppProvider = ({ children }) => {
           translation: typeof dua.translation === 'string' 
             ? (() => {
                 try {
-                  const parsed = JSON.parse(dua.translation);
-                  console.log('Successfully parsed translation for dua:', dua.id, parsed);
-                  return parsed;
+                  return JSON.parse(dua.translation);
                 } catch (e) {
                   console.error('Failed to parse translation:', dua.translation, e);
                   return { english: '', amharic: '', oromo: '' };
@@ -615,10 +612,8 @@ export const AppProvider = ({ children }) => {
             ? `${API_BASE_URL}${dua.audio.startsWith('/') ? '' : '/'}${dua.audio}` 
             : dua.audio
         };
-        console.log('Processed dua:', processedDua.id, 'translation:', processedDua.translation, 'audio:', processedDua.audio);
         return processedDua;
       });
-      console.log('Final processed data:', processedData);
       setDuas(processedData);
       return processedData;
     } catch (error) {
@@ -640,19 +635,25 @@ export const AppProvider = ({ children }) => {
     try {
       const formData = new FormData();
       
-      // Add text fields
       formData.append('title', duaData.title);
       formData.append('arabic', duaData.arabic);
       formData.append('category', duaData.category);
-      formData.append('translation', JSON.stringify(duaData.translation));
+
+      // Correctly expand the translation object into individual FormData fields
+      if (duaData.translation && typeof duaData.translation === 'object') {
+        for (const key in duaData.translation) {
+          if (Object.prototype.hasOwnProperty.call(duaData.translation, key)) {
+            formData.append(`translation[${key}]`, duaData.translation[key] || '');
+          }
+        }
+      }
       
-      // Add audio file if provided
       if (duaData.audioFile) {
         formData.append('audio', duaData.audioFile);
       }
 
       const created = await duasAPI.create(formData);
-      setDuas((prev) => [...prev, created]);
+      await refreshDuas(); // Refresh the list to get the latest data
       addActivity({
         type: "dua_added",
         message: `Admin added new dua: ${created.title}`,
@@ -660,7 +661,8 @@ export const AppProvider = ({ children }) => {
       });
       return created;
     } catch (error) {
-      throw new Error(error.message || "Failed to add dua");
+      // The error from the backend already contains a descriptive message
+      throw new Error(error.response?.data?.message?.[0] || error.message || "Failed to add dua");
     }
   }
 
@@ -668,19 +670,25 @@ export const AppProvider = ({ children }) => {
     try {
       const formData = new FormData();
       
-      // Add text fields
       formData.append('title', duaData.title);
       formData.append('arabic', duaData.arabic);
       formData.append('category', duaData.category);
-      formData.append('translation', JSON.stringify(duaData.translation));
+
+      // Correctly expand the translation object into individual FormData fields
+      if (duaData.translation && typeof duaData.translation === 'object') {
+        for (const key in duaData.translation) {
+          if (Object.prototype.hasOwnProperty.call(duaData.translation, key)) {
+            formData.append(`translation[${key}]`, duaData.translation[key] || '');
+          }
+        }
+      }
       
-      // Add audio file if provided (optional for updates)
       if (duaData.audioFile) {
         formData.append('audio', duaData.audioFile);
       }
 
       const updated = await duasAPI.update(duaId, formData);
-      setDuas((prev) => prev.map((d) => (d.id === duaId ? updated : d)));
+      await refreshDuas(); // Refresh the list
       addActivity({
         type: "dua_updated",
         message: `Admin updated dua: ${updated.title}`,
@@ -688,7 +696,7 @@ export const AppProvider = ({ children }) => {
       });
       return updated;
     } catch (error) {
-      throw new Error(error.message || "Failed to update dua");
+      throw new Error(error.response?.data?.message?.[0] || error.message || "Failed to update dua");
     }
   }
 
@@ -748,7 +756,7 @@ export const AppProvider = ({ children }) => {
       updateDua,
       deleteDua,
     }),
-    [isAuthenticated, user, sidebarCollapsed, notifications, stats, recentActivities, currentPage, fcmToken, users, groups, messages, duas, duaCategories, login, logout, toggleSidebar, addNotification, removeNotification, addActivity, updateCurrentPage, addUser, updateUser, deleteUser, addGroup, updateGroup, deleteGroup, refreshUsers, refreshGroups, assignUserToGroup, removeUserFromGroup, addMessage, updateStats, refreshDuas, refreshDuaCategories, addDua, updateDua, deleteDua]
+    [isAuthenticated, user, sidebarCollapsed, notifications, stats, recentActivities, currentPage, fcmToken, users, groups, messages, duas, duaCategories, logout, toggleSidebar, addNotification, removeNotification, addActivity, updateCurrentPage, addUser, updateUser, deleteUser, addGroup, updateGroup, deleteGroup, refreshUsers, refreshGroups, assignUserToGroup, removeUserFromGroup, addMessage, updateStats, refreshDuas, refreshDuaCategories, addDua, updateDua, deleteDua]
   )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
