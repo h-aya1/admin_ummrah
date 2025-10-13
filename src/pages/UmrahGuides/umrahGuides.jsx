@@ -365,30 +365,46 @@ const GuideModal = ({ guide, onClose, onSave }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Build clean payload for JSON when no files are selected
+    const parsedOrder = parseInt(formData.order, 10);
+    const safeOrder = Number.isFinite(parsedOrder) && parsedOrder >= 1 ? parsedOrder : 1;
+    const hasFiles = Boolean(files.image || files.video || files.audio);
+    const jsonPayload = {
+      title: formData.title,
+      description: formData.description || '',
+      order: safeOrder,
+      translation: {
+        english: formData.translation?.english || '',
+        amharic: formData.translation?.amharic || '',
+        oromo: formData.translation?.oromo || '',
+      },
+    };
+
+    // If any files are present, fallback to multipart
     const submitData = new FormData();
-    submitData.append('title', formData.title);
-    submitData.append('description', formData.description || '');
-
-    // FIX: Correctly append order as a number and expand the translation object
-    submitData.append('order', Number(formData.order));
-
-    if (formData.translation && typeof formData.translation === 'object') {
-        for (const key in formData.translation) {
-            if (Object.prototype.hasOwnProperty.call(formData.translation, key)) {
-                submitData.append(`translation[${key}]`, formData.translation[key] || '');
-            }
-        }
+    if (hasFiles) {
+      submitData.append('title', jsonPayload.title);
+      submitData.append('description', jsonPayload.description);
+      submitData.append('order', String(jsonPayload.order));
+      submitData.append('translation[english]', jsonPayload.translation.english);
+      submitData.append('translation[amharic]', jsonPayload.translation.amharic);
+      submitData.append('translation[oromo]', jsonPayload.translation.oromo);
+      if (files.image) submitData.append('image', files.image);
+      if (files.video) submitData.append('video', files.video);
+      if (files.audio) submitData.append('audio', files.audio);
     }
-
-    if (files.image) submitData.append('image', files.image);
-    if (files.video) submitData.append('video', files.video);
-    if (files.audio) submitData.append('audio', files.audio);
 
     try {
         if (guide) { // This is an update
-            await guidesAPI.update(guide.id, submitData);
+            if (hasFiles) {
+              await guidesAPI.update(guide.id, submitData);
+            } else {
+              await guidesAPI.updateJson(guide.id, jsonPayload);
+            }
         } else { // This is a new guide creation
-            const newGuide = await guidesAPI.create(submitData);
+            const newGuide = hasFiles
+              ? await guidesAPI.create(submitData)
+              : await guidesAPI.createJson(jsonPayload);
             const guideId = newGuide.id;
 
             // If there are local steps, create them now

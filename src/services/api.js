@@ -239,10 +239,25 @@ export const guidesAPI = {
     });
   },
 
+  // JSON variants for strict validators when no files are included
+  async createJson(payload) {
+    return apiCall('/guides', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   async update(id, formData) {
     return apiCallWithFiles(`/guides/${id}`, {
       method: 'PUT',
       body: formData,
+    });
+  },
+
+  async updateJson(id, payload) {
+    return apiCall(`/guides/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
     });
   },
 
