@@ -422,7 +422,10 @@ const AddMemberSection = ({ group, users, onAssignUser }) => {
 }
 
 const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignUser, onRemoveUser }) => {
-  const members = Array.isArray(group?.members) ? group.members : []
+  const members = Array.isArray(group?.members) ? group.members.map(member => {
+    const user = users.find(u => u.id === member.id);
+    return user ? { ...member, name: user.name } : member;
+  }) : [];
   const totalMembers = members.length
   const lastActivity = group?.lastActivity ? new Date(group.lastActivity).toLocaleString() : "N/A"
   const activeMembers = typeof group?.activeMembers === 'number' ? group.activeMembers : 0
@@ -542,6 +545,7 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
           email: item?.email || "",
           role: item?.role || "pilgrim",
           emergencyContact: item?.emergencyContact || "",
+          groupId: item?.groupId || "",
         },
   )
   // Only users with role 'amir' for group leader selection
@@ -567,14 +571,18 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
   }
 
   const handleSubmit = (e) => {
-    e.preventDefault()
+    e.preventDefault();
+    const dataToSend = { ...formData };
+    delete dataToSend.groupName; // Ensure groupName is not sent
+
     if (type === "user") {
-      const selectedGroup = groups.find((g) => g.id === Number.parseInt(formData.groupId))
-      formData.groupName = selectedGroup?.name || ""
-      // Phone is required, email is optional
-      if (!formData.phone) {
-        alert("Phone number is required.")
-        return
+      if (!dataToSend.phone) {
+        alert("Phone number is required.");
+        return;
+      }
+      if (dataToSend.role === 'amir' && !dataToSend.groupId) {
+        alert('An Amir must be assigned to a group.');
+        return;
       }
     }
     if (type === "group") {
@@ -589,7 +597,7 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
         return
       }
     }
-    onSave(formData)
+    onSave(dataToSend);
   }
 
   return (
@@ -686,6 +694,18 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
                   <option value="amir">Amir</option>
                 </select>
               </div>
+
+              {formData.role === 'amir' && (
+                <div className="form-group">
+                  <label>Group <span style={{color: 'red'}}>*</span></label>
+                  <select name="groupId" value={formData.groupId} onChange={handleChange} className="input" required>
+                    <option value="">Select a group...</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>{group.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Emergency Contact</label>

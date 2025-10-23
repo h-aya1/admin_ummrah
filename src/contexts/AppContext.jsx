@@ -3,7 +3,12 @@ import { authAPI, usersAPI, groupsAPI, duasAPI } from "../services/api"
 // Firebase imports for push notifications
 import { requestForToken, onMessageListener } from "../firebase"
 
-const API_BASE_URL = 'http://69.62.109.18:3001'; // Should match the one in api.js
+// API service with authentication
+const API_BASE_URL =
+  window.location.hostname === 'localhost'
+    ? 'http://localhost:3000'
+    : 'http://69.62.109.18:3001';
+console.log('Using API base URL:', API_BASE_URL);
 
 const generateRandomPassword = (length = 10) => {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@$!%*?&"
@@ -18,52 +23,58 @@ const generateRandomPassword = (length = 10) => {
 const PASSWORD_STORE_KEY = "adminUserPasswords"
 
 const ensureAmirMember = (group, usersList = []) => {
-  if (!group) return group
-  const members = Array.isArray(group.members) ? [...group.members] : []
-  const amirId = group?.amirId != null ? String(group.amirId) : null
-  const amirName = typeof group?.amir === "string" ? group.amir : ""
+  if (!group) return group;
 
-  const hasAmir = members.some((member) => {
-    const memberId = member?.id != null ? String(member.id) : null
-    return (
-      (amirId && memberId === amirId) ||
-      (amirName && member?.name === amirName) ||
-      member?.role === "amir"
-    )
-  })
+  // Find the amir user based on the UUID in group.amir
+  const amirUser = usersList.find(user => user.id === group.amir);
+
+  // Create a new group object with the amir's name. Fallback to the UUID if user not found.
+  const groupWithAmirName = {
+    ...group,
+    amir: amirUser ? amirUser.name : group.amir,
+  };
+
+  const members = Array.isArray(group.members) ? [...group.members] : [];
+  const amirId = group?.amir; // This is the UUID from the original group object
+
+  // Check if the amir is already in the members list
+  const hasAmir = members.some(member => String(member.id) === String(amirId));
 
   if (hasAmir) {
+    // If amir is already a member, just return the group object with the resolved amir name
     return {
-      ...group,
+      ...groupWithAmirName,
       members,
       totalMembers: group.totalMembers ?? members.length,
-    }
+    };
   }
 
-  const amirUser = usersList.find((user) => {
-    const userId = user?.id != null ? String(user.id) : null
-    return (
-      (amirId && userId === amirId) ||
-      (amirName && user?.name === amirName)
-    )
-  })
+  // If amir is not in the members list, create a member object for them
+  const amirMember = amirUser
+    ? {
+        id: amirUser.id,
+        name: amirUser.name,
+        phone: amirUser.phone ?? "",
+        role: "amir",
+        joinedAt: amirUser.joinedAt || new Date().toISOString().split("T")[0],
+      }
+    : { // Create a fallback member object if the amir user wasn't found in the users list
+        id: amirId,
+        name: "Group Amir (User not found)",
+        phone: "",
+        role: "amir",
+        joinedAt: new Date().toISOString().split("T")[0],
+      };
 
-  const amirMember = {
-    id: amirUser?.id ?? amirId ?? `amir-${group.id}`,
-    name: amirUser?.name ?? amirName ?? "Group Amir",
-    phone: amirUser?.phone ?? "",
-    role: "amir",
-    joinedAt: amirUser?.joinedAt || new Date().toISOString().split("T")[0],
-  }
+  const updatedMembers = [amirMember, ...members];
 
-  const updatedMembers = [amirMember, ...members]
-
+  // Return the group with the resolved amir name and the updated members list
   return {
-    ...group,
+    ...groupWithAmirName,
     members: updatedMembers,
     totalMembers: Math.max(updatedMembers.length, group.totalMembers ?? 0),
-  }
-}
+  };
+};
 
 const normalizeGroupsWithAmir = (groupsList = [], usersList = []) =>
   groupsList.map((group) => ensureAmirMember(group, usersList))
@@ -362,7 +373,13 @@ export const AppProvider = ({ children }) => {
 
   const updateUser = async (userId, userData) => {
     try {
-      const updated = await usersAPI.update(userId, userData);
+      // Sanitize the payload to remove empty optional fields like email
+      const payload = { ...userData };
+      if (payload.email === "") {
+        delete payload.email;
+      }
+
+      const updated = await usersAPI.update(userId, payload);
       const nextPassword = (userData?.password || "").trim();
       if (nextPassword) {
         persistUserPasswords((prev) => ({ ...prev, [userId]: nextPassword }))
@@ -421,6 +438,7 @@ export const AppProvider = ({ children }) => {
 
       const payload = {
         ...groupData,
+        amir: amirUser ? amirUser.id : null,
         createdAt: new Date().toISOString().split("T")[0],
         members: amirMember ? [amirMember] : [],
         totalMembers: amirMember ? 1 : 0,
@@ -430,7 +448,14 @@ export const AppProvider = ({ children }) => {
       };
 
       const created = await groupsAPI.create(payload);
-      const normalizedCreated = ensureAmirMember(created, users);
+
+      // Restore the amir name for the local state
+      const createdForState = {
+        ...created,
+        amir: groupData.amir, // The name from the form
+      };
+
+      const normalizedCreated = ensureAmirMember(createdForState, users);
       setGroups((prev) => [...prev, normalizedCreated]);
 
       // Update the amir user's group assignment
@@ -462,8 +487,30 @@ export const AppProvider = ({ children }) => {
   const updateGroup = async (groupId, groupData) => {
     try {
       const payload = { ...groupData, lastActivity: new Date().toISOString() };
+
+      // If the amir is being changed, we need to find the user's ID from their name
+      if (groupData.amir) {
+        const amirUser = users.find(u => u.name === groupData.amir);
+        if (amirUser) {
+          payload.amir = amirUser.id; // Use the UUID for the API call
+        } else {
+          // Handle case where amir name is provided but not found
+          // Option 1: Throw an error
+          throw new Error(`Amir "${groupData.amir}" not found.`);
+          // Option 2: Remove from payload to avoid backend error
+          // delete payload.amir;
+        }
+      }
+
       const updated = await groupsAPI.update(groupId, payload);
-      const normalized = ensureAmirMember(updated, users);
+
+      // Restore the amir name for the local state if it was part of the update
+      const updatedForState = {
+        ...updated,
+        amir: groupData.amir || groups.find(g => g.id === groupId)?.amir,
+      };
+
+      const normalized = ensureAmirMember(updatedForState, users);
       setGroups((prev) => prev.map((g) => (g.id === groupId ? normalized : g)));
       addActivity({
         type: "group_updated",
