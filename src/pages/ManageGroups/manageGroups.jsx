@@ -715,8 +715,33 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
                   value={formData.emergencyContact}
                   onChange={handleChange}
                   className="input"
-                  required
                 />
+              </div>
+
+              <div className="form-group">
+                <label>Group</label>
+                {item?.groupName ? (
+                  <input
+                    type="text"
+                    value={item.groupName}
+                    className="input"
+                    disabled
+                  />
+                ) : (
+                  <select
+                    name="groupId"
+                    value={formData.groupId}
+                    onChange={handleChange}
+                    className="input"
+                  >
+                    <option value="">Select a group...</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               
