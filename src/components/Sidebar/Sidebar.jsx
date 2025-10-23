@@ -3,6 +3,7 @@ import { useState, useEffect } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { useAppContext } from "../../contexts/AppContext"
 import "./Sidebar.css"
+import HanimLogo from "../../assets/Hanim Tour & Travel Logo Small size.png"
 
 const Sidebar = () => {
   const { sidebarCollapsed, toggleSidebar } = useAppContext()
@@ -111,11 +112,11 @@ const Sidebar = () => {
       <div className={`sidebar ${sidebarCollapsed && !isMobile ? "collapsed" : ""} ${mobileOpen ? "mobile-open" : ""}`}>
         <div className="sidebar-header">
           <div className="logo">
-            <span className="logo-icon">🕋</span>
+            <img src={HanimLogo} alt="Hanim Tour & Travel" className="logo-image" style={{ height: '50px' }} />
             {(!sidebarCollapsed || isMobile) && (
               <div className="logo-text">
-                <h2>Umrah Admin</h2>
-                <p>Management Portal</p>
+                <h2>Hanim</h2>
+                <p>Tour & Travel</p>
               </div>
             )}
           </div>
@@ -147,8 +148,8 @@ const Sidebar = () => {
       <div className="sidebar-footer">
         {!sidebarCollapsed && !isMobile && (
           <div className="footer-content">
-            <p className="footer-text">Umrah Guide Admin v1.0</p>
-            <p className="footer-subtext">Spiritual Travel Management</p>
+            <p className="footer-text">Hanim Tour & Travel</p>
+            <p className="footer-subtext">© 2025 All Rights Reserved</p>
           </div>
         )}
       </div>

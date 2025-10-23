@@ -37,14 +37,15 @@
 }
 
 .logo-text h2 {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+  line-height: 1;
 }
 
 .logo-text p {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
   margin: 0;
 }
@@ -87,7 +88,7 @@
 }
 
 .nav-item.active {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: rgba(43, 58, 103, 0.1);
   color: var(--accent-primary);
   border-left-color: var(--accent-primary);
 }
