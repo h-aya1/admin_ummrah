@@ -1,4 +1,4 @@
-// src/components/chat/Chat.js
+// src/components/chat/Chat.jsx
 
 import { useState, useEffect, useRef } from "react";
 import { useAppContext } from "../../contexts/AppContext";
@@ -57,14 +57,11 @@ const Chat = () => {
       fetchHistoricalMessages(selectedGroup.id);
 
       // 2. Connect to the WebSocket for real-time updates.
-      // The backend requires a groupId in the JWT payload for an admin to join a specific room.
-      // A more advanced solution might involve a dedicated backend endpoint for an admin to
-      // get a temporary, group-specific token. For now, we assume the backend handles this.
       connectToGroupChat(authToken);
     }
 
     // 3. Cleanup function: This is crucial. It runs when the component unmounts
-    // OR when the `selectedGroup` changes, ensuring we disconnect from the old room before joining a new one.
+    // OR when the `selectedGroup` changes, ensuring we disconnect from the old room.
     return () => {
       disconnectFromChat();
     };
@@ -91,10 +88,7 @@ const Chat = () => {
         throw new Error(`Failed to fetch messages: ${response.statusText}`);
       }
       
-      const result = await response.json(); // The backend returns { data: [messages], total, page, lastPage }
-      
-      // Use the new context function to replace the messages for this specific group,
-      // preventing messages from different groups from mixing in the state.
+      const result = await response.json();
       setMessagesForGroup(groupId, result.data);
 
     } catch (error) {
@@ -105,13 +99,12 @@ const Chat = () => {
 
 
   /**
-   * Establishes a real WebSocket connection to the NestJS backend using socket.io-client.
+   * Establishes a real WebSocket connection to the NestJS backend.
    */
   const connectToGroupChat = (token) => {
-    disconnectFromChat(); // Ensure any old connection is closed first
+    disconnectFromChat();
     setConnectionStatus("connecting");
     
-    // Create the socket instance with the necessary auth headers for the handshake
     const socket = io(SOCKET_URL, {
       transports: ["websocket"],
       extraHeaders: {
@@ -119,10 +112,9 @@ const Chat = () => {
       },
     });
 
-    // Store the socket instance in a ref to persist it across re-renders
     socketRef.current = socket;
 
-    // --- SETUP EVENT LISTENERS for this specific socket instance ---
+    // --- SETUP EVENT LISTENERS for this socket instance ---
     
     socket.on("connect", () => {
       console.log(`Connected to chat server with socket ID: ${socket.id}`);
@@ -139,7 +131,6 @@ const Chat = () => {
       setConnectionStatus("error");
     });
 
-    // Listens for the initial batch of messages sent by the server upon a successful connection
     socket.on("messageHistory", (history) => {
       console.log("Received message history via WebSocket:", history);
       if (selectedGroup) {
@@ -147,10 +138,8 @@ const Chat = () => {
       }
     });
 
-    // Listens for new, live messages broadcasted by the server to the room
     socket.on("newMessage", (message) => {
       console.log("New live message received:", message);
-      // Only add the message to the global state if it belongs to the currently viewed group
       if (message.groupId === selectedGroup?.id) {
         addMessage(message);
       }
@@ -158,7 +147,7 @@ const Chat = () => {
   };
 
   /**
-   * Disconnects from the WebSocket server and cleans up the reference to avoid memory leaks.
+   * Disconnects from the WebSocket server and cleans up the reference.
    */
   const disconnectFromChat = () => {
     if (socketRef.current) {
@@ -168,7 +157,7 @@ const Chat = () => {
   };
 
   /**
-   * Sends a message to the server using `emitWithAck` to get a direct confirmation callback.
+   * Sends a message to the server using `emitWithAck` for confirmation.
    */
   const sendMessage = async (messageText) => {
     if (!selectedGroup || !messageText.trim() || !socketRef.current || connectionStatus !== 'connected') {
@@ -181,18 +170,16 @@ const Chat = () => {
       content: messageText.trim(),
     };
 
-    // Use `emitWithAck` which provides a callback from the server, confirming receipt and processing.
     socketRef.current.emit("sendMessage", payload, (response) => {
       setSendingMessage(false);
       
       if (response && response.status === "ok") {
         console.log("Message sent and acknowledged by server:", response.message);
-        // Add the server-confirmed message to our state. This is the source of truth.
         addMessage(response.message);
-        setNewMessage(""); // Clear the input field only on successful send
+        setNewMessage("");
       } else {
         console.error("Server failed to process message:", response?.error);
-        alert(`Failed to send message: ${response?.error || 'An unknown error occurred'}`);
+        alert(`Failed to send message: ${response?.error || 'Unknown error'}`);
       }
     });
   };
@@ -200,7 +187,6 @@ const Chat = () => {
   // ============ UTILITY AND HANDLER FUNCTIONS ============
   
   const canSendMessage = () => {
-    // This is a client-side UI check. The server is the ultimate authority on permissions.
     return currentUser?.role === "admin";
   };
   
