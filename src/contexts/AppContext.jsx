@@ -6,10 +6,7 @@ import { authAPI, usersAPI, groupsAPI, duasAPI } from "../services/api"
 import { requestForToken, onMessageListener } from "../firebase"
 
 // API service with authentication
-const API_BASE_URL =
-  window.location.hostname === 'localhost'
-    ? 'http://localhost:3001'
-    : 'http://69.62.109.18:3001';
+const API_BASE_URL = 'http://69.62.109.18:3001';
 console.log('Using API base URL:', API_BASE_URL);
 
 const generateRandomPassword = (length = 10) => {
@@ -119,36 +116,50 @@ export const AppProvider = ({ children }) => {
   const [duaCategories, setDuaCategories] = useState([])
   const usersRef = useRef([])
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (isAuthenticated) {
-        try {
-          const [usersResponse, groupsResponse, duasResponse, categoriesResponse] = await Promise.all([
-            usersAPI.getAll(),
-            groupsAPI.getAll(),
-            duasAPI.getAll(),
-            duasAPI.getCategories(),
-          ]);
-          const usersWithPasswords = usersResponse.map((user) => (
-            userPasswords?.[user.id]
-              ? { ...user, password: userPasswords[user.id] }
-              : user
-          ));
-          setUsers(usersWithPasswords);
-          usersRef.current = usersWithPasswords;
-          setGroups(normalizeGroupsWithAmir(groupsResponse, usersWithPasswords));
-          setDuas(duasResponse);
-          setDuaCategories(categoriesResponse || []);
-        } catch (error) {
-          console.error('Failed to load data:', error);
-          if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
-            logout();
-          }
-        }
+  const logout = useCallback(() => {
+    localStorage.removeItem("adminToken")
+    localStorage.removeItem("adminUser")
+    setAuthToken(null);
+    setIsAuthenticated(false)
+    setCurrentUser(null)
+    setUsers([]);
+    setGroups([]);
+    setMessages([]);
+  }, []);
+
+  const loadInitialData = useCallback(async () => {
+    try {
+      const [usersResponse, groupsResponse, duasResponse, categoriesResponse] = await Promise.all([
+        usersAPI.getAll(),
+        groupsAPI.getAll(),
+        duasAPI.getAll(),
+        duasAPI.getCategories(),
+      ]);
+      const usersWithPasswords = usersResponse.map((user) => (
+        userPasswords?.[user.id]
+          ? { ...user, password: userPasswords[user.id] }
+          : user
+      ));
+      setUsers(usersWithPasswords);
+      usersRef.current = usersWithPasswords;
+      setGroups(normalizeGroupsWithAmir(groupsResponse, usersWithPasswords));
+      setDuas(duasResponse);
+      setDuaCategories(categoriesResponse || []);
+    } catch (error) {
+      console.error('Failed to load initial data:', error);
+      if (error.response?.status === 401 || error.message?.includes('401')) {
+        logout();
       }
-    };
-    loadData();
-  }, [isAuthenticated]);
+    }
+  }, [userPasswords, logout]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("adminToken");
+    if (token) {
+      setIsAuthenticated(true);
+      loadInitialData();
+    }
+  }, [loadInitialData]);
 
   useEffect(() => {
     const totalUsers = users.length
@@ -186,10 +197,10 @@ export const AppProvider = ({ children }) => {
 
       localStorage.setItem("adminToken", token);
       localStorage.setItem("adminUser", JSON.stringify(userData));
-
       setAuthToken(token);
       setIsAuthenticated(true);
       setCurrentUser(userData);
+      await loadInitialData();
 
       try {
         const fcmTokenValue = await requestForToken();
@@ -205,14 +216,6 @@ export const AppProvider = ({ children }) => {
     } catch (error) {
       return { success: false, error: error.message || "Login failed" };
     }
-  }
-
-  const logout = () => {
-    localStorage.removeItem("adminToken")
-    localStorage.removeItem("adminUser")
-    setAuthToken(null);
-    setIsAuthenticated(false)
-    setCurrentUser(null)
   }
 
   const toggleSidebar = () => {
@@ -394,22 +397,28 @@ export const AppProvider = ({ children }) => {
   const addGroup = async (groupData) => {
     try {
       const amirUser = users.find((u) => u.name === groupData.amir);
-      const amirMember = amirUser ? { id: amirUser.id, name: amirUser.name, phone: amirUser.phone, role: "amir", joinedAt: new Date().toISOString().split("T")[0] } : null;
-      const payload = { ...groupData, amir: amirUser ? amirUser.id : null, createdAt: new Date().toISOString().split("T")[0], members: amirMember ? [amirMember] : [], totalMembers: amirMember ? 1 : 0, activeMembers: 0, location: groupData.location || "Not set", lastActivity: new Date().toISOString() };
+      const payload = {
+        ...groupData,
+        amir: amirUser ? amirUser.id : null,
+      };
+
       const created = await groupsAPI.create(payload);
-      const createdForState = { ...created, amir: groupData.amir };
-      const normalizedCreated = ensureAmirMember(createdForState, users);
-      setGroups((prev) => [...prev, normalizedCreated]);
+
       if (amirUser) {
-        try {
-          const updatedAmir = await usersAPI.update(amirUser.id, { groupId: created.id, groupName: created.name });
-          setUsers((prev) => prev.map((u) => (u.id === updatedAmir.id ? updatedAmir : u)));
-        } catch (e) {
-          console.error("Failed to update amir user's group assignment:", e);
-          await refreshUsers().catch(() => {});
-        }
+        await usersAPI.update(amirUser.id, {
+          groupId: created.id,
+        }).catch(e => console.error("Failed to update amir user's group assignment:", e));
       }
-      addActivity({ type: "group_created", message: `Admin created new group: ${created.name}`, icon: "🏕️" });
+
+      await refreshGroups();
+      await refreshUsers();
+
+      addActivity({
+        type: "group_created",
+        message: `Admin created new group: ${created.name}`,
+        icon: "🏕️",
+      })
+
       return created;
     } catch (error) {
       throw new Error(error.message || "Failed to add group");
@@ -418,7 +427,8 @@ export const AppProvider = ({ children }) => {
 
   const updateGroup = async (groupId, groupData) => {
     try {
-      const payload = { ...groupData, lastActivity: new Date().toISOString() };
+      const payload = { ...groupData };
+
       if (groupData.amir) {
         const amirUser = users.find(u => u.name === groupData.amir);
         if (amirUser) {
@@ -427,12 +437,15 @@ export const AppProvider = ({ children }) => {
           throw new Error(`Amir "${groupData.amir}" not found.`);
         }
       }
-      const updated = await groupsAPI.update(groupId, payload);
-      const updatedForState = { ...updated, amir: groupData.amir || groups.find(g => g.id === groupId)?.amir };
-      const normalized = ensureAmirMember(updatedForState, users);
-      setGroups((prev) => prev.map((g) => (g.id === groupId ? normalized : g)));
-      addActivity({ type: "group_updated", message: `Admin updated group: ${normalized.name}`, icon: "✏️" });
-      return normalized;
+
+      await groupsAPI.update(groupId, payload);
+      await refreshGroups();
+
+      addActivity({
+        type: "group_updated",
+        message: `Admin updated group: ${groupData.name}`,
+        icon: "✏️",
+      })
     } catch (error) {
       throw new Error(error.message || "Failed to update group");
     }
@@ -444,7 +457,11 @@ export const AppProvider = ({ children }) => {
       await groupsAPI.delete(groupId);
       setGroups((prev) => prev.filter((g) => g.id !== groupId));
       await refreshUsers().catch(() => {});
-      addActivity({ type: "group_deleted", message: `Admin deleted group: ${groupToDelete?.name || groupId}`, icon: "🗑️" });
+      addActivity({
+        type: "group_deleted",
+        message: `Admin deleted group: ${groupToDelete?.name || groupId}`,
+        icon: "🗑️",
+      })
       return true;
     } catch (error) {
       throw new Error(error.message || "Failed to delete group");
@@ -454,18 +471,16 @@ export const AppProvider = ({ children }) => {
   const assignUserToGroup = async (userId, groupId) => {
     try {
       const group = groups.find((g) => g.id === groupId);
-      const userObj = users.find((u) => u.id === userId);
-      if (!group || !userObj) {
-        throw new Error("User or group not found");
-      }
-      const updatedUser = await usersAPI.update(userId, { groupId, groupName: group.name });
-      const userWithGroup = { ...userObj, ...updatedUser, groupId: updatedUser?.groupId ?? groupId, groupName: updatedUser?.groupName ?? group.name, password: userObj.password || userPasswords?.[userId] };
-      const optimisticUsers = users.map((u) => (u.id === userId ? userWithGroup : u));
-      setUsers(optimisticUsers);
-      const refreshedGroups = await refreshGroups(optimisticUsers);
-      const updatedGroup = refreshedGroups.find((g) => g.id === groupId) || group;
-      addActivity({ type: "pilgrim_added", message: `Added ${userObj.name} to ${updatedGroup.name}`, icon: "➕" });
-      return updatedGroup;
+      if (!group) throw new Error("Group not found");
+
+      await usersAPI.update(userId, { groupId });
+      await Promise.all([refreshGroups(), refreshUsers()]);
+
+      addActivity({
+        type: "pilgrim_added",
+        message: `Added user to ${group.name}`,
+        icon: "➕",
+      })
     } catch (error) {
       await Promise.allSettled([refreshGroups(), refreshUsers()]);
       throw new Error(error.message || "Failed to assign user to group");
@@ -475,34 +490,38 @@ export const AppProvider = ({ children }) => {
   const removeUserFromGroup = async (userId, groupId) => {
     try {
       const group = groups.find((g) => g.id === groupId);
-      const userObj = users.find((u) => u.id === userId);
-      if (!group) { throw new Error("Group not found"); }
-      const updatedUser = await usersAPI.update(userId, { groupId: null, groupName: null });
-      const userWithoutGroup = { ...userObj, ...updatedUser, groupId: null, groupName: "", password: userObj?.password || userPasswords?.[userId] };
-      const optimisticUsers = users.map((u) => (u.id === userId ? userWithoutGroup : u));
-      setUsers(optimisticUsers);
-      const refreshedGroups = await refreshGroups(optimisticUsers);
-      const updatedGroup = refreshedGroups.find((g) => g.id === groupId) || group;
-      addActivity({ type: "pilgrim_removed", message: `Removed ${userObj?.name || "User"} from ${group.name}`, icon: "➖" });
-      return updatedGroup;
+      if (!group) throw new Error("Group not found");
+
+      await usersAPI.update(userId, { groupId: null });
+      await Promise.all([refreshGroups(), refreshUsers()]);
+
+      addActivity({
+        type: "pilgrim_removed",
+        message: `Removed user from ${group.name}`,
+        icon: "➖",
+      })
     } catch (error) {
       await Promise.allSettled([refreshGroups(), refreshUsers()]);
       throw new Error(error.message || "Failed to remove user from group");
     }
   }
 
-  const addMessage = (messageData) => {
-    // Prevent duplicates from race conditions
-    setMessages((prev) => prev.some(m => m.id === messageData.id) ? prev : [...prev, messageData]);
-    addActivity({ type: "message_sent", message: `Admin sent message to group`, icon: "💬" });
-  }
-
-  const setMessagesForGroup = (groupId, newMessages) => {
+  // ========================= MESSAGE ORDERING FIX =========================
+  // The global state functions are now simplified. The Chat component will handle
+  // its own state for real-time updates. These functions are kept for other
+  // potential uses or can be removed if chat is the only consumer.
+  const addMessage = useCallback((messageData) => {
+    setMessages((prev) => [...prev, messageData]);
+  }, []);
+  
+  const setMessagesForGroup = useCallback((groupId, newMessages) => {
     setMessages(prevMessages => {
       const otherGroupMessages = prevMessages.filter(m => m.groupId !== groupId);
-      return [...otherGroupMessages, ...newMessages];
+      const sortedNewMessages = newMessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      return [...otherGroupMessages, ...sortedNewMessages];
     });
-  };
+  }, []);
+  // ======================================================================
 
   const updateStats = useCallback((newStats) => {
     setStats((prev) => ({ ...prev, ...newStats }))
@@ -511,11 +530,25 @@ export const AppProvider = ({ children }) => {
   const refreshDuas = useCallback(async (filters = {}) => {
     try {
       const data = await duasAPI.getAll(filters);
-      const processedData = data.map(dua => ({
-        ...dua,
-        translation: typeof dua.translation === 'string' ? JSON.parse(dua.translation) : dua.translation,
-        audio: dua.audio && !dua.audio.startsWith('http') ? `${API_BASE_URL}${dua.audio.startsWith('/') ? '' : '/'}${dua.audio}` : dua.audio
-      }));
+      const processedData = data.map(dua => {
+        const processedDua = {
+          ...dua,
+          translation: typeof dua.translation === 'string' 
+            ? (() => {
+                try {
+                  return JSON.parse(dua.translation);
+                } catch (e) {
+                  console.error('Failed to parse translation:', dua.translation, e);
+                  return { english: '', amharic: '', oromo: '' };
+                }
+              })()
+            : dua.translation,
+          audio: dua.audio && !dua.audio.startsWith('http') 
+            ? `${API_BASE_URL}${dua.audio.startsWith('/') ? '' : '/'}${dua.audio}` 
+            : dua.audio
+        };
+        return processedDua;
+      });
       setDuas(processedData);
       return processedData;
     } catch (error) {
@@ -536,20 +569,30 @@ export const AppProvider = ({ children }) => {
   const addDua = async (duaData) => {
     try {
       const formData = new FormData();
+      
       formData.append('title', duaData.title);
       formData.append('arabic', duaData.arabic);
       formData.append('category', duaData.category);
+
       if (duaData.translation && typeof duaData.translation === 'object') {
         for (const key in duaData.translation) {
-          formData.append(`translation[${key}]`, duaData.translation[key] || '');
+          if (Object.prototype.hasOwnProperty.call(duaData.translation, key)) {
+            formData.append(`translation[${key}]`, duaData.translation[key] || '');
+          }
         }
       }
+      
       if (duaData.audioFile) {
         formData.append('audio', duaData.audioFile);
       }
+
       const created = await duasAPI.create(formData);
       await refreshDuas();
-      addActivity({ type: "dua_added", message: `Admin added new dua: ${created.title}`, icon: "📿" });
+      addActivity({
+        type: "dua_added",
+        message: `Admin added new dua: ${created.title}`,
+        icon: "📿",
+      });
       return created;
     } catch (error) {
       throw new Error(error.response?.data?.message?.[0] || error.message || "Failed to add dua");
@@ -559,20 +602,30 @@ export const AppProvider = ({ children }) => {
   const updateDua = async (duaId, duaData) => {
     try {
       const formData = new FormData();
+      
       formData.append('title', duaData.title);
       formData.append('arabic', duaData.arabic);
       formData.append('category', duaData.category);
+
       if (duaData.translation && typeof duaData.translation === 'object') {
         for (const key in duaData.translation) {
-          formData.append(`translation[${key}]`, duaData.translation[key] || '');
+          if (Object.prototype.hasOwnProperty.call(duaData.translation, key)) {
+            formData.append(`translation[${key}]`, duaData.translation[key] || '');
+          }
         }
       }
+      
       if (duaData.audioFile) {
         formData.append('audio', duaData.audioFile);
       }
+
       const updated = await duasAPI.update(duaId, formData);
       await refreshDuas();
-      addActivity({ type: "dua_updated", message: `Admin updated dua: ${updated.title}`, icon: "✏️" });
+      addActivity({
+        type: "dua_updated",
+        message: `Admin updated dua: ${updated.title}`,
+        icon: "✏️",
+      });
       return updated;
     } catch (error) {
       throw new Error(error.response?.data?.message?.[0] || error.message || "Failed to update dua");
@@ -584,7 +637,11 @@ export const AppProvider = ({ children }) => {
       const duaToDelete = duas.find((d) => d.id === duaId);
       await duasAPI.delete(duaId);
       setDuas((prev) => prev.filter((d) => d.id !== duaId));
-      addActivity({ type: "dua_deleted", message: `Admin deleted dua: ${duaToDelete?.title || duaId}`, icon: "🗑️" });
+      addActivity({
+        type: "dua_deleted",
+        message: `Admin deleted dua: ${duaToDelete?.title || duaId}`,
+        icon: "🗑️",
+      });
       return true;
     } catch (error) {
       throw new Error(error.message || "Failed to delete dua");
@@ -604,7 +661,7 @@ export const AppProvider = ({ children }) => {
       fcmToken,
       users,
       groups,
-      messages,
+      messages, // Still provided for other potential components
       duas,
       duaCategories,
       login,
@@ -624,8 +681,8 @@ export const AppProvider = ({ children }) => {
       refreshGroups,
       assignUserToGroup,
       removeUserFromGroup,
-      addMessage,
-      setMessagesForGroup,
+      addMessage, // Still provided
+      setMessagesForGroup, // Still provided
       updateStats,
       refreshDuas,
       refreshDuaCategories,
@@ -633,7 +690,7 @@ export const AppProvider = ({ children }) => {
       updateDua,
       deleteDua,
     }),
-    [isAuthenticated, currentUser, authToken, sidebarCollapsed, notifications, stats, recentActivities, currentPage, fcmToken, users, groups, messages, duas, duaCategories, logout, toggleSidebar, addNotification, removeNotification, addActivity, updateCurrentPage, addUser, updateUser, deleteUser, addGroup, updateGroup, deleteGroup, refreshUsers, refreshGroups, assignUserToGroup, removeUserFromGroup, addMessage, updateStats, refreshDuas, refreshDuaCategories, addDua, updateDua, deleteDua]
+    [isAuthenticated, currentUser, authToken, sidebarCollapsed, notifications, stats, recentActivities, currentPage, fcmToken, users, groups, messages, duas, duaCategories, addMessage, setMessagesForGroup, addActivity, addDua, addGroup, addNotification, addUser, assignUserToGroup, deleteDua, deleteGroup, deleteUser, login, logout, refreshDuaCategories, refreshDuas, refreshGroups, refreshUsers, removeNotification, removeUserFromGroup, toggleSidebar, updateCurrentPage, updateDua, updateGroup, updateStats, updateUser]
   )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
