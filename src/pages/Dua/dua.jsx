@@ -422,7 +422,7 @@ const DuaModal = ({ dua, onClose, onSave, categories = [] }) => {
 
           <div className="form-group">
             <label>Audio {dua ? "(optional - leave empty to keep current)" : ""}</label>
-            <input type="file" id="audio" name="audio" accept="audio/*" onChange={handleChange} className="input" required={!dua} />
+            <input type="file" id="audio" name="audio" accept="audio/*" onChange={handleChange} className="input" />
             {formData.audio && (
               <audio controls src={formData.audio} style={{ width: "100%", marginTop: "8px" }}>
                 Your browser does not support the audio element.
