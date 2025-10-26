@@ -1,3 +1,5 @@
+/* src/chat/chat.css - CORRECTED VERSION */
+
 .chat-page {
   padding: 0;
   height: calc(100vh - 70px);
@@ -177,6 +179,21 @@
 .message-item {
   display: flex;
   gap: 12px;
+  align-items: flex-start; /* FIX: Aligns avatar and content nicely */
+}
+.message-item:hover .message-actions {
+  opacity: 1; /* Show options on hover */
+}
+.message-item.deleted {
+  opacity: 0.7; /* Style for deleted messages */
+}
+
+/* FIX: Added back the missing error styling */
+.message-item.error {
+  background-color: rgba(239, 68, 68, 0.05); /* faint red background */
+  border-left: 2px solid var(--danger);
+  padding-left: 10px;
+  border-radius: 4px;
 }
 
 .message-avatar {
@@ -225,11 +242,15 @@
 
 .sender-name {
   font-size: 14px;
-  font-weight: 600; /* Made bolder for emphasis */
-  transition: color 0.3s ease; /* Added transition for color changes */
+  font-weight: 600;
 }
 
 .message-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+/* FIX: Renamed class to match JSX */
+.edited-indicator {
   font-size: 11px;
   color: var(--text-muted);
 }
@@ -242,20 +263,17 @@
   white-space: pre-wrap;
 }
 
+.message-text-deleted {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
 .message-link {
   color: var(--accent-primary);
   text-decoration: underline;
 }
-
-.message-link:hover {
-  text-decoration: none;
-}
-
-.message-tag {
-  font-weight: 500;
-  color: var(--accent-secondary);
-  cursor: pointer;
-}
+.message-link:hover { text-decoration: none; }
+.message-tag { font-weight: 500; color: var(--accent-secondary); cursor: pointer; }
 
 .message-image {
   max-width: 300px;
@@ -267,6 +285,71 @@
   border: 1px solid var(--border-color);
 }
 
+/* FIX: Renamed class from .message-options to match JSX */
+.message-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  align-items: center;
+  padding-left: 10px;
+}
+.message-actions button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+.message-actions button:hover { background-color: var(--bg-tertiary); }
+
+
+/* Styles for Editing (These are fine, but I'm including for completeness) */
+.edit-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.edit-message-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  resize: vertical;
+}
+.edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.edit-actions button {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.edit-actions button:last-child {
+  background-color: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+
+/* FIX: Renamed class to match JSX */
+.typing-indicator-container {
+  padding: 4px 20px;
+  height: 24px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
 .no-group-selected {
   display: flex;
   flex-direction: column;
@@ -276,13 +359,7 @@
   text-align: center;
   padding: 40px;
 }
-
-.no-group-selected h3 {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 8px 0;
-}
+.no-group-selected h3 { font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px 0; }
 
 .message-input-container {
   border-top: 1px solid var(--border-color);
@@ -290,17 +367,8 @@
   padding: 16px 20px;
 }
 
-.message-input-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.input-wrapper {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-}
+.message-input-form { display: flex; flex-direction: column; gap: 8px; }
+.input-wrapper { display: flex; gap: 12px; align-items: flex-end; }
 
 .message-input {
   flex: 1;
@@ -316,11 +384,7 @@
   resize: none;
   transition: border-color 0.2s ease;
 }
-
-.message-input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-}
+.message-input:focus { outline: none; border-color: var(--accent-primary); }
 
 .connection-warning {
   background-color: rgba(245, 158, 11, 0.1);
@@ -338,12 +402,7 @@
   margin-bottom: 8px;
   align-self: flex-start;
 }
-
-.image-preview {
-  max-height: 100px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-}
+.image-preview { max-height: 100px; border-radius: 8px; border: 1px solid var(--border-color); }
 
 .remove-preview-btn {
   position: absolute;
@@ -374,15 +433,8 @@
   height: 42px;
   flex-shrink: 0;
 }
-
-.btn-attach:hover {
-  background-color: var(--bg-primary);
-}
-
-.btn-attach:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+.btn-attach:hover { background-color: var(--bg-primary); }
+.btn-attach:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .btn {
   padding: 8px 16px;
