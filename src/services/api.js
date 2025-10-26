@@ -1,8 +1,8 @@
 // API service with authentication
 const API_BASE_URL =
   window.location.hostname === 'localhost'
-    ? 'http://localhost:3000'
-    : 'http://69.62.109.18:3001';
+    ? 'http://69.62.109.18:3001'
+    : 'http://localhost:3000';
 console.log('Using API base URL:', API_BASE_URL);
 
 // Helper to get auth headers
@@ -300,6 +300,16 @@ export const stepsAPI = {
     return apiCall(`/guides/steps/${id}`, {
       method: 'DELETE',
     });
+  },
+};
+
+export const locationAPI = {
+  async getAllUserLocations() {
+    return apiCall('/location/all-users');
+  },
+
+  async getGroupMemberLocations() {
+    return apiCall('/location/group-members');
   },
 };
 
