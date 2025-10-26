@@ -104,29 +104,29 @@ export const authAPI = {
 // Users API
 export const usersAPI = {
   async getAll() {
-    return apiCall('/users'); // GET all users
+    return apiCall('/admin/users'); // GET all users (admin route)
   },
 
   async getById(id) {
-    return apiCall(`/users/${id}`);
+    return apiCall(`/admin/users/${id}`);
   },
 
   async create(payload) {
-    return apiCall('/users', {
+    return apiCall('/admin/users', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
   },
 
   async update(id, payload) {
-    return apiCall(`/users/${id}`, {
+    return apiCall(`/admin/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
   },
 
   async delete(id) {
-    return apiCall(`/users/${id}`, {
+    return apiCall(`/admin/users/${id}`, {
       method: 'DELETE',
     });
   },
@@ -135,25 +135,25 @@ export const usersAPI = {
 // Groups API
 export const groupsAPI = {
   async getAll() {
-    return apiCall('/groups'); // GET all groups
+    return apiCall('/admin/groups'); // GET all groups (admin route)
   },
 
   async create(payload) {
-    return apiCall('/groups', {
+    return apiCall('/admin/groups', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
   },
 
   async update(id, payload) {
-    return apiCall(`/groups/${id}`, {
+    return apiCall(`/admin/groups/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
   },
 
   async delete(id) {
-    return apiCall(`/groups/${id}`, {
+    return apiCall(`/admin/groups/${id}`, {
       method: 'DELETE',
     });
   },
