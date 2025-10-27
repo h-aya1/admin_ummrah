@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import "./umrahGuides.css"
-import { guidesAPI, stepsAPI } from "../../services/api"
+import { guidesAPI, stepsAPI, getAssetUrl } from "../../services/api"
 
 const UmrahGuides = () => {
   const [guides, setGuides] = useState([])
@@ -84,9 +84,9 @@ const UmrahGuides = () => {
           <div key={guide.id} className="guide-card">
             {guide.image && (
               <div className="guide-image-container">
-                <img 
-                  src={`http://localhost:3000/${guide.image}`} 
-                  alt={guide.title} 
+                <img
+                  src={getAssetUrl(guide.image)}
+                  alt={guide.title}
                   className="guide-image"
                 />
               </div>
@@ -206,6 +206,32 @@ const GuideDetailModal = ({ guide, onClose }) => {
                       <span className="step-location">📍 {step.location}</span>
                     )}
                   </div>
+                  {(step.audio || step.video) && (
+                    <div className="step-media">
+                      {step.audio && (
+                        <div className="step-audio">
+                          <audio
+                            controls
+                            src={getAssetUrl(step.audio)}
+                            style={{ width: "100%", marginTop: "8px" }}
+                          >
+                            Your browser does not support the audio element.
+                          </audio>
+                        </div>
+                      )}
+                      {step.video && (
+                        <div className="step-video">
+                          <video
+                            controls
+                            src={getAssetUrl(step.video)}
+                            style={{ width: "100%", marginTop: "12px" }}
+                          >
+                            Your browser does not support the video tag.
+                          </video>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -418,6 +444,8 @@ const GuideModal = ({ guide, onClose, onSave }) => {
                     stepData.append('guideId', guideId);
 
                     if (step.files?.image) stepData.append('image', step.files.image);
+                    if (step.files?.audio) stepData.append('audio', step.files.audio);
+                    if (step.files?.video) stepData.append('video', step.files.video);
 
                     await stepsAPI.create(stepData);
                 }
@@ -529,7 +557,7 @@ const GuideModal = ({ guide, onClose, onSave }) => {
             />
             {guide?.image && !files.image && (
               <div className="current-file">
-                Current: <img src={`http://localhost:3000/${guide.image}`} alt="Current" style={{ width: "100px", marginTop: "8px" }} />
+                Current: <img src={getAssetUrl(guide.image)} alt="Current" style={{ width: "100px", marginTop: "8px" }} />
               </div>
             )}
           </div>
@@ -603,6 +631,8 @@ const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
   })
   const [files, setFiles] = useState({
     image: initialFiles?.image || null,
+    audio: initialFiles?.audio || null,
+    video: initialFiles?.video || null,
   })
 
   useEffect(() => {
@@ -664,6 +694,14 @@ const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
 
     if (files.image) {
       submitData.append('image', files.image)
+    }
+
+    if (files.audio) {
+      submitData.append('audio', files.audio)
+    }
+
+    if (files.video) {
+      submitData.append('video', files.video)
     }
 
     await onSave(submitData, files)
@@ -769,9 +807,64 @@ const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
               className="input"
               required={!step?.image}
             />
+            {files.image?.name && (
+              <div className="current-file">Selected: {files.image.name}</div>
+            )}
             {step?.image && !files.image && (
               <div className="current-file">
-                Current: <img src={`http://localhost:3000/${step.image}`} alt="Current" style={{ width: "100px", marginTop: "8px" }} />
+                Current: <img src={getAssetUrl(step.image)} alt="Current" style={{ width: "100px", marginTop: "8px" }} />
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label>Audio (optional)</label>
+            <input
+              type="file"
+              name="audio"
+              accept="audio/*"
+              onChange={handleFileChange}
+              className="input"
+            />
+            {files.audio?.name && (
+              <div className="current-file">Selected: {files.audio.name}</div>
+            )}
+            {step?.audio && !files.audio && (
+              <div className="current-file">
+                Current:
+                <audio
+                  controls
+                  src={getAssetUrl(step.audio)}
+                  style={{ width: "100%", marginTop: "8px" }}
+                >
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label>Video (optional)</label>
+            <input
+              type="file"
+              name="video"
+              accept="video/*"
+              onChange={handleFileChange}
+              className="input"
+            />
+            {files.video?.name && (
+              <div className="current-file">Selected: {files.video.name}</div>
+            )}
+            {step?.video && !files.video && (
+              <div className="current-file">
+                Current:
+                <video
+                  controls
+                  src={getAssetUrl(step.video)}
+                  style={{ width: "100%", marginTop: "8px" }}
+                >
+                  Your browser does not support the video tag.
+                </video>
               </div>
             )}
           </div>

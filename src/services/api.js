@@ -1,9 +1,19 @@
 // API service with authentication
-const API_BASE_URL =
+export const API_BASE_URL =
   window.location.hostname === 'localhost'
     ? 'http://69.62.109.18:3001'
     : 'http://localhost:3000';
 console.log('Using API base URL:', API_BASE_URL);
+
+export const getAssetUrl = (path) => {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+  const normalizedBase = API_BASE_URL.replace(/\/$/, '');
+  const normalizedPath = path.replace(/^\/+/, '');
+  return `${normalizedBase}/${normalizedPath}`;
+};
 
 // Helper to get auth headers
 const getAuthHeaders = () => {

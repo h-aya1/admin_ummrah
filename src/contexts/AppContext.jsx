@@ -82,6 +82,33 @@ export const useAppContext = () => {
   return context
 }
 
+const normalizeDua = (dua) => {
+  const translation = typeof dua?.translation === 'string'
+    ? (() => {
+        try {
+          return JSON.parse(dua.translation);
+        } catch (e) {
+          console.error('Failed to parse translation:', dua.translation, e);
+          return { english: '', amharic: '', oromo: '' };
+        }
+      })()
+    : dua?.translation;
+
+  const normalizedAudioPath = typeof dua?.audio === 'string'
+    ? dua.audio.replace(/\\/g, '/')
+    : dua?.audio;
+
+  const audio = normalizedAudioPath && typeof normalizedAudioPath === 'string' && !normalizedAudioPath.startsWith('http')
+    ? `${API_BASE_URL}${normalizedAudioPath.startsWith('/') ? '' : '/'}${normalizedAudioPath}`
+    : normalizedAudioPath;
+
+  return {
+    ...dua,
+    translation,
+    audio,
+  };
+};
+
 export const AppProvider = ({ children }) => {
   const [authToken, setAuthToken] = useState(() => localStorage.getItem("adminToken"));
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem("adminToken"))
@@ -143,7 +170,7 @@ export const AppProvider = ({ children }) => {
       setUsers(usersWithPasswords);
       usersRef.current = usersWithPasswords;
       setGroups(normalizeGroupsWithAmir(groupsResponse, usersWithPasswords));
-      setDuas(duasResponse);
+      setDuas((duasResponse || []).map(normalizeDua));
       setDuaCategories(categoriesResponse || []);
     } catch (error) {
       console.error('Failed to load initial data:', error);
@@ -151,7 +178,7 @@ export const AppProvider = ({ children }) => {
         logout();
       }
     }
-  }, [userPasswords, logout]);
+  }, [userPasswords, logout, normalizeDua]);
 
   useEffect(() => {
     const token = localStorage.getItem("adminToken");
@@ -530,31 +557,14 @@ export const AppProvider = ({ children }) => {
   const refreshDuas = useCallback(async (filters = {}) => {
     try {
       const data = await duasAPI.getAll(filters);
-      const processedData = data.map(dua => {
-        const processedDua = {
-          ...dua,
-          translation: typeof dua.translation === 'string' 
-            ? (() => {
-                try {
-                  return JSON.parse(dua.translation);
-                } catch (e) {
-                  console.error('Failed to parse translation:', dua.translation, e);
-                  return { english: '', amharic: '', oromo: '' };
-                }
-              })()
-            : dua.translation,
-          audio: dua.audio && !dua.audio.startsWith('http') 
-            ? `${API_BASE_URL}${dua.audio.startsWith('/') ? '' : '/'}${dua.audio}` 
-            : dua.audio
-        };
-        return processedDua;
-      });
+      const processedData = (data || []).map(normalizeDua);
+
       setDuas(processedData);
       return processedData;
     } catch (error) {
       throw new Error(error.message || "Failed to fetch duas");
     }
-  }, []);
+  }, [normalizeDua]);
 
   const refreshDuaCategories = useCallback(async () => {
     try {
