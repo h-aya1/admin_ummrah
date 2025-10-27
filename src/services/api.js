@@ -284,39 +284,31 @@ export const guidesAPI = {
 
 export const stepsAPI = {
   async getAll(guideId = null) {
+    // FIX: Ensure the parameter name is exactly 'guideId'
     const query = guideId ? `?guideId=${guideId}` : '';
-    return apiCall(`/guides/steps${query}`);
+    return apiCall(`/guides/steps/all${query}`);
   },
-
   async getById(id) {
     return apiCall(`/guides/steps/${id}`);
   },
-
   async create(formData) {
-    // Ensure image field exists even if empty
-    if (!formData.has('image')) {
-      formData.append('image', '');
-    }
-    return apiCallWithFiles('/guides/steps', {
+    return apiCall('/guides/steps', {
       method: 'POST',
       body: formData,
     });
   },
-
   async update(id, formData) {
-    return apiCallWithFiles(`/guides/steps/${id}`, {
+    return apiCall(`/guides/steps/${id}`, {
       method: 'PUT',
       body: formData,
     });
   },
-
   async delete(id) {
     return apiCall(`/guides/steps/${id}`, {
       method: 'DELETE',
     });
   },
 };
-
 export const locationAPI = {
   async getAllUserLocations() {
     return apiCall('/location/all-users');

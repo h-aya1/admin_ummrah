@@ -1,79 +1,84 @@
-import { useState, useEffect, useRef } from "react"
-import "./umrahGuides.css"
-import { guidesAPI, stepsAPI, getAssetUrl } from "../../services/api"
+import { useState, useEffect, useRef } from "react";
+import "./umrahGuides.css";
+import { guidesAPI, stepsAPI, getAssetUrl } from "../../services/api";
 
+// --- Reusable Loading Spinner Component ---
+const LoadingSpinner = ({ message }) => (
+  <div className="guides-loading">
+    <div className="loading-spinner"></div>
+    <p>{message}</p>
+  </div>
+);
+
+// =================================================================
+// Main Page Component
+// =================================================================
 const UmrahGuides = () => {
-  const [guides, setGuides] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [editingGuide, setEditingGuide] = useState(null)
-  const [selectedGuide, setSelectedGuide] = useState(null)
+  const [guides, setGuides] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isGuideModalOpen, setGuideModalOpen] = useState(false);
+  const [editingGuide, setEditingGuide] = useState(null);
+  const [selectedGuide, setSelectedGuide] = useState(null);
 
   useEffect(() => {
-    loadGuides()
-  }, [])
+    loadGuides();
+  }, []);
 
   const loadGuides = async () => {
     try {
-      setLoading(true)
-      const data = await guidesAPI.getAll()
-      setGuides(data || [])
+      setLoading(true);
+      const data = await guidesAPI.getAll();
+      setGuides(data || []);
     } catch (error) {
-      console.error('Failed to load guides:', error)
-      // You might want to show an error message to the user here
+      console.error("Failed to load guides:", error);
+      alert("Failed to load guides. Please check the console for details.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleAddGuide = () => {
-    setEditingGuide(null)
-    setShowAddModal(true)
-  }
+    setEditingGuide(null);
+    setGuideModalOpen(true);
+  };
 
   const handleEditGuide = (guide) => {
-    setEditingGuide(guide)
-    setShowAddModal(true)
-  }
+    setEditingGuide(guide);
+    setGuideModalOpen(true);
+  };
 
   const handleDeleteGuide = async (id) => {
-    if (window.confirm("Are you sure you want to delete this guide?")) {
+    if (window.confirm("Are you sure you want to delete this guide and all its steps?")) {
       try {
-        await guidesAPI.delete(id)
-        setGuides(guides.filter((guide) => guide.id !== id))
+        await guidesAPI.delete(id);
+        // Reload all guides to ensure consistency
+        await loadGuides();
       } catch (error) {
-        console.error('Failed to delete guide:', error)
-        alert('Failed to delete guide. Please try again.')
+        console.error("Failed to delete guide:", error);
+        alert("Failed to delete guide. Please try again.");
       }
     }
-  }
+  };
 
   const handleViewGuide = (guide) => {
-    setSelectedGuide(guide)
-  }
-
-  // Centralized save handler to reload data and close modal
+    setSelectedGuide(guide);
+  };
+  
+  // Centralized success handler to reload data and close modals
   const onSaveSuccess = async () => {
     await loadGuides();
-    setShowAddModal(false);
+    setGuideModalOpen(false);
+    setEditingGuide(null);
   };
 
   if (loading) {
-    return (
-      <div className="guides-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading guides...</p>
-      </div>
-    )
+    return <LoadingSpinner message="Loading guides..." />;
   }
 
   return (
     <div className="guides-page">
       <div className="page-header">
-        <div className="header-content">
-          <h1>Umrah Guides</h1>
-          <p>Manage step-by-step guides for Umrah pilgrimage</p>
-        </div>
+        <h1>Umrah Guides</h1>
         <button className="btn btn-primary" onClick={handleAddGuide}>
           Add New Guide
         </button>
@@ -82,156 +87,104 @@ const UmrahGuides = () => {
       <div className="guides-grid">
         {guides.map((guide) => (
           <div key={guide.id} className="guide-card">
-            {guide.image && (
-              <div className="guide-image-container">
-                <img
-                  src={getAssetUrl(guide.image)}
-                  alt={guide.title}
-                  className="guide-image"
-                />
-              </div>
-            )}
+            <div className="guide-image-container">
+              <img
+                src={guide.image ? getAssetUrl(guide.image) : "https://via.placeholder.com/400x200?text=No+Image"}
+                alt={guide.title}
+                className="guide-image"
+              />
+            </div>
             <div className="guide-header">
-              <div className="guide-info">
-                <h3 className="guide-title">{guide.title}</h3>
-              </div>
+              <h3 className="guide-title">{guide.title}</h3>
               <div className="guide-actions">
-                <button className="action-btn view" onClick={() => handleViewGuide(guide)}>
-                  👁️
-                </button>
-                <button className="action-btn edit" onClick={() => handleEditGuide(guide)}>
-                  ✏️
-                </button>
-                <button className="action-btn delete" onClick={() => handleDeleteGuide(guide.id)}>
-                  🗑️
-                </button>
+                <button title="View" className="action-btn view" onClick={() => handleViewGuide(guide)}>👁️</button>
+                <button title="Edit" className="action-btn edit" onClick={() => handleEditGuide(guide)}>✏️</button>
+                <button title="Delete" className="action-btn delete" onClick={() => handleDeleteGuide(guide.id)}>🗑️</button>
               </div>
             </div>
-
-            <div className="guide-meta">
-              <span className="guide-order">Step {guide.order}</span>
-            </div>
-
+            <p className="guide-description">{guide.description}</p>
             <div className="guide-stats">
+              <div className="stat">
+                <span className="stat-value">{guide.order}</span>
+                <span className="stat-label">Order</span>
+              </div>
               <div className="stat">
                 <span className="stat-value">{guide.steps?.length || 0}</span>
                 <span className="stat-label">Steps</span>
-              </div>
-              <div className="stat">
-                <span className="stat-value">
-                  {guide.steps?.reduce((total, step) => {
-                    const duration = Number.parseInt(step.duration) || 0
-                    return total + duration
-                  }, 0)}
-                  m
-                </span>
-                <span className="stat-label">Duration</span>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {selectedGuide && <GuideDetailModal guide={selectedGuide} onClose={() => setSelectedGuide(null)} />}
+      {selectedGuide && <GuideDetailModal guideId={selectedGuide.id} onClose={() => setSelectedGuide(null)} />}
 
-      {showAddModal && (
+      {isGuideModalOpen && (
         <GuideModal
           guide={editingGuide}
-          onClose={() => setShowAddModal(false)}
-          onSave={onSaveSuccess}
+          onClose={() => setGuideModalOpen(false)}
+          onSaveSuccess={onSaveSuccess}
         />
       )}
     </div>
-  )
-}
+  );
+};
 
-const GuideDetailModal = ({ guide, onClose }) => {
-  const modalRef = useRef(null)
+// =================================================================
+// Guide Detail Modal (View Only)
+// =================================================================
+const GuideDetailModal = ({ guideId, onClose }) => {
+  const [guide, setGuide] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (modalRef.current && event.target === modalRef.current) {
-        onClose()
+    const fetchGuide = async () => {
+      try {
+        setLoading(true);
+        const data = await guidesAPI.getById(guideId);
+        setGuide(data);
+      } catch (error) {
+        console.error("Failed to fetch guide details:", error);
+        alert("Could not load guide details.");
+        onClose();
+      } finally {
+        setLoading(false);
       }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [onClose])
+    };
+    fetchGuide();
+  }, [guideId, onClose]);
+  
+  if (loading || !guide) {
+    return (
+      <div className="modal-overlay">
+        <div className="modal-content large">
+          <LoadingSpinner message="Loading guide details..." />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="modal-overlay" ref={modalRef}>
+    <div className="modal-overlay">
       <div className="modal-content large">
         <div className="modal-header">
           <h2>{guide.title}</h2>
-          <button className="close-btn" onClick={onClose}>
-            ×
-          </button>
+          <button className="close-btn" onClick={onClose}>×</button>
         </div>
-
         <div className="guide-detail">
-          <div className="guide-overview">
-            <div className="guide-meta-detail">
-              <span className="meta-item">Order: {guide.order}</span>
-            </div>
-          </div>
-
-          <div className="steps-list">
+            <p>{guide.description}</p>
             <h3>Steps ({guide.steps?.length || 0})</h3>
-            {(guide.steps || []).map((step, index) => (
+            <div className="steps-list">
+            {(guide.steps || []).map((step) => (
               <div key={step.id} className="step-item">
-                <div className="step-number">{index + 1}</div>
+                <img src={getAssetUrl(step.image)} alt={step.title} className="step-item-image" />
                 <div className="step-content">
-                  <h4 className="step-title">{step.title}</h4>
-                  <p className="step-description">{step.description}</p>
-                  {step.text && (
-                    <div className="step-translations">
-                      <div className="translation">
-                        <strong>English:</strong> {step.text.english}
-                      </div>
-                      <div className="translation">
-                        <strong>Amharic:</strong> {step.text.amharic}
-                      </div>
-                      <div className="translation">
-                        <strong>Oromo:</strong> {step.text.oromo}
-                      </div>
-                    </div>
-                  )}
-                  {step.arabic && <div className="step-arabic">{step.arabic}</div>}
+                  <h4>{step.order}. {step.title}</h4>
+                  <p>{step.description}</p>
                   <div className="step-meta">
-                    <span className="step-duration">⏱️ {step.duration}</span>
-                    {step.location && (
-                      <span className="step-location">📍 {step.location}</span>
-                    )}
+                    <span>⏱️ {step.duration}</span>
+                    {step.location && <span>📍 {step.location}</span>}
                   </div>
-                  {(step.audio || step.video) && (
-                    <div className="step-media">
-                      {step.audio && (
-                        <div className="step-audio">
-                          <audio
-                            controls
-                            src={getAssetUrl(step.audio)}
-                            style={{ width: "100%", marginTop: "8px" }}
-                          >
-                            Your browser does not support the audio element.
-                          </audio>
-                        </div>
-                      )}
-                      {step.video && (
-                        <div className="step-video">
-                          <video
-                            controls
-                            src={getAssetUrl(step.video)}
-                            style={{ width: "100%", marginTop: "12px" }}
-                          >
-                            Your browser does not support the video tag.
-                          </video>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
             ))}
@@ -239,11 +192,14 @@ const GuideDetailModal = ({ guide, onClose }) => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-const GuideModal = ({ guide, onClose, onSave }) => {
-  const modalRef = useRef(null)
+
+// =================================================================
+// Guide Add/Edit Modal
+// =================================================================
+const GuideModal = ({ guide, onClose, onSaveSuccess }) => {
   const [formData, setFormData] = useState({
     title: guide?.title || "",
     description: guide?.description || "",
@@ -253,373 +209,211 @@ const GuideModal = ({ guide, onClose, onSave }) => {
       amharic: guide?.translation?.amharic || "",
       oromo: guide?.translation?.oromo || "",
     },
-    steps: guide?.steps || [],
-  })
-  const [files, setFiles] = useState({
-    image: null,
-  })
-  const [showStepModal, setShowStepModal] = useState(false)
-  const [editingStep, setEditingStep] = useState(null)
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (modalRef.current && event.target === modalRef.current) {
-        onClose()
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [onClose])
+  });
+  const [imageFile, setImageFile] = useState(null);
+  const [isSubmitting, setSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
-
     if (name.startsWith("translation.")) {
-      const lang = name.split(".")[1]
-      setFormData({
-        ...formData,
-        translation: {
-          ...formData.translation,
-          [lang]: value,
-        },
-      })
+      const lang = name.split(".")[1];
+      setFormData(prev => ({ ...prev, translation: { ...prev.translation, [lang]: value } }));
     } else {
-      // FIX: Ensure `order` is stored as a number
-      const processedValue = type === 'number' ? parseInt(value, 10) || 0 : value;
-      setFormData({ ...formData, [name]: processedValue });
+      setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseInt(value, 10) || 1 : value }));
     }
-  }
+  };
 
   const handleFileChange = (e) => {
-    const { name, files: fileList } = e.target
-    setFiles({
-      ...files,
-      [name]: fileList[0] || null,
-    })
-  }
-
-  const handleAddStep = () => {
-    setEditingStep(null)
-    setShowStepModal(true)
-  }
-
-  const handleEditStep = (step) => {
-    setEditingStep(step)
-    setShowStepModal(true)
-  }
-
-  const handleDeleteStep = async (stepId) => {
-    if (window.confirm("Are you sure you want to delete this step?")) {
-      try {
-        if (guide) {
-          await stepsAPI.delete(stepId)
-          const updatedGuide = await guidesAPI.getById(guide.id)
-          setFormData(prev => ({ ...prev, steps: updatedGuide.steps || [] }))
-        } else {
-          setFormData({
-            ...formData,
-            steps: formData.steps.filter(step => step.id !== stepId)
-          })
-        }
-      } catch (error) {
-        console.error('Failed to delete step:', error)
-        alert('Failed to delete step. Please try again.')
-      }
-    }
-  }
-
-  const handleSaveStep = async (stepData, stepFiles) => {
-    try {
-      if (guide) {
-        const hasIncomingImage = stepData.get('image');
-        if (!editingStep && !hasIncomingImage) {
-          alert('Please provide an image for the step.');
-          return;
-        }
-        if (editingStep) {
-          await stepsAPI.update(editingStep.id, stepData)
-        } else {
-          await stepsAPI.create(stepData)
-        }
-        const updatedGuide = await guidesAPI.getById(guide.id)
-        setFormData(prev => ({ ...prev, steps: updatedGuide.steps || [] }))
-      } else {
-        const stepFormData = {
-          title: stepData.get('title'),
-          description: stepData.get('description'),
-          text: JSON.parse(stepData.get('text')),
-          arabic: stepData.get('arabic') || '',
-          duration: stepData.get('duration'),
-          location: stepData.get('location') || '',
-        }
-
-        if (!stepFiles?.image && !editingStep?.files?.image) {
-          alert('Please provide an image for the step.');
-          return;
-        }
-
-        if (editingStep) {
-          setFormData({
-            ...formData,
-            steps: formData.steps.map(step =>
-              step.id === editingStep.id ? { ...step, ...stepFormData, files: stepFiles } : step
-            )
-          })
-        } else {
-          const newStep = {
-            ...stepFormData,
-            id: Date.now().toString(),
-            isLocal: true,
-            files: stepFiles
-          }
-          setFormData({
-            ...formData,
-            steps: [...formData.steps, newStep]
-          })
-        }
-      }
-      setShowStepModal(false)
-    } catch (error) {
-      console.error('Failed to save step:', error)
-      alert('Failed to save step. Please try again.')
-    }
-  }
+    setImageFile(e.target.files[0] || null);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
 
-    // Build clean payload for JSON when no files are selected
-    const parsedOrder = parseInt(formData.order, 10);
-    const safeOrder = Number.isFinite(parsedOrder) && parsedOrder >= 1 ? parsedOrder : 1;
-    const hasFiles = Boolean(files.image);
-    const jsonPayload = {
-      title: formData.title,
-      description: formData.description || '',
-      order: safeOrder,
-      translation: {
-        english: formData.translation?.english || '',
-        amharic: formData.translation?.amharic || '',
-        oromo: formData.translation?.oromo || '',
-      },
-    };
-
-    // If any files are present, fallback to multipart
     const submitData = new FormData();
-    if (hasFiles) {
-      submitData.append('title', jsonPayload.title);
-      submitData.append('description', jsonPayload.description);
-      submitData.append('order', String(jsonPayload.order));
-      submitData.append('translation[english]', jsonPayload.translation.english);
-      submitData.append('translation[amharic]', jsonPayload.translation.amharic);
-      submitData.append('translation[oromo]', jsonPayload.translation.oromo);
-      if (files.image) submitData.append('image', files.image);
+    submitData.append('title', formData.title);
+    submitData.append('description', formData.description || '');
+    submitData.append('order', formData.order);
+    
+    // FIX: Stringify the translation object for multipart/form-data
+    submitData.append('translation', JSON.stringify(formData.translation));
+    
+    if (imageFile) {
+      submitData.append('image', imageFile);
     }
 
     try {
-        if (guide) { // This is an update
-            if (hasFiles) {
-              await guidesAPI.update(guide.id, submitData);
-            } else {
-              await guidesAPI.updateJson(guide.id, jsonPayload);
-            }
-        } else { // This is a new guide creation
-            const newGuide = hasFiles
-              ? await guidesAPI.create(submitData)
-              : await guidesAPI.createJson(jsonPayload);
-            const guideId = newGuide.id;
-
-            // If there are local steps, create them now
-            for (const step of formData.steps) {
-                if (step.isLocal) {
-                    const stepData = new FormData();
-                    stepData.append('title', step.title);
-                    stepData.append('description', step.description);
-                    stepData.append('text', JSON.stringify(step.text));
-                    stepData.append('arabic', step.arabic || '');
-                    stepData.append('duration', step.duration);
-                    stepData.append('location', step.location || '');
-                    stepData.append('guideId', guideId);
-
-                    if (step.files?.image) stepData.append('image', step.files.image);
-                    if (step.files?.audio) stepData.append('audio', step.files.audio);
-                    if (step.files?.video) stepData.append('video', step.files.video);
-
-                    await stepsAPI.create(stepData);
-                }
-            }
-        }
-        await onSave(); // This will reload the guides list and close the modal
+      if (guide) {
+        await guidesAPI.update(guide.id, submitData);
+      } else {
+        await guidesAPI.create(submitData);
+      }
+      onSaveSuccess();
     } catch (error) {
-        console.error('Failed to save guide:', error);
-        console.error('Error details:', error.message, error.response?.data);
-        const errorMessage = error.response?.data?.message?.[0] || 'Failed to save guide. Please check your input.';
-        alert(errorMessage);
+      console.error("Failed to save guide:", error.response?.data || error.message);
+      const errorMessage = error.response?.data?.message?.[0] || 'Failed to save guide.';
+      alert(errorMessage);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="modal-overlay" ref={modalRef}>
-      <div className="modal-content">
+    <div className="modal-overlay">
+      <div className="modal-content large">
         <div className="modal-header">
           <h2>{guide ? "Edit Guide" : "Add New Guide"}</h2>
-          <button className="close-btn" onClick={onClose}>
-            ×
-          </button>
+          <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
         <form onSubmit={handleSubmit} className="guide-form">
           <div className="form-group">
             <label>Title</label>
-            <input type="text" name="title" value={formData.title} onChange={handleChange} className="input" required />
+            <input type="text" name="title" value={formData.title} onChange={handleChange} required />
           </div>
 
           <div className="form-group">
-            <label>Description</label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              className="input"
-              rows="3"
-              placeholder="Optional description..."
-            />
+            <label>Description (Optional)</label>
+            <textarea name="description" value={formData.description} onChange={handleChange} rows="3" />
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Order</label>
-              <input
-                type="number"
-                name="order"
-                value={formData.order}
-                onChange={handleChange}
-                className="input"
-                min="1"
-                required
-              />
-            </div>
+          <div className="form-group">
+            <label>Order</label>
+            <input type="number" name="order" value={formData.order} onChange={handleChange} min="1" required />
           </div>
-
-          <div className="translations-section">
-            <h3>Guide Translations</h3>
-            
-            <div className="form-group">
-              <label>English</label>
-              <textarea
-                name="translation.english"
-                value={formData.translation.english}
-                onChange={handleChange}
-                className="input"
-                rows="3"
-                placeholder="Guide description in English..."
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Amharic</label>
-              <textarea
-                name="translation.amharic"
-                value={formData.translation.amharic}
-                onChange={handleChange}
-                className="input"
-                rows="3"
-                placeholder="Guide description in Amharic..."
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Oromo</label>
-              <textarea
-                name="translation.oromo"
-                value={formData.translation.oromo}
-                onChange={handleChange}
-                className="input"
-                rows="3"
-                placeholder="Guide description in Oromo..."
-                required
-              />
-            </div>
-          </div>
-
+          
           <div className="form-group">
             <label>Image</label>
-            <input 
-              type="file" 
-              name="image" 
-              accept="image/*" 
-              onChange={handleFileChange} 
-              className="input" 
-            />
-            {guide?.image && !files.image && (
-              <div className="current-file">
-                Current: <img src={getAssetUrl(guide.image)} alt="Current" style={{ width: "100px", marginTop: "8px" }} />
-              </div>
+            <input type="file" name="image" accept="image/*" onChange={handleFileChange} />
+            {guide?.image && !imageFile && (
+              <div className="current-file">Current: <img src={getAssetUrl(guide.image)} alt="Current" /></div>
             )}
           </div>
-
+          
+          <h3>Guide Title Translations</h3>
           <div className="form-group">
-            <div className="steps-section">
-              <div className="steps-header">
-                <h3>Steps ({formData.steps.length})</h3>
-                <button type="button" className="btn btn-secondary" onClick={handleAddStep}>
-                  Add Step
-                </button>
-              </div>
-              <div className="steps-list">
-                {formData.steps.map((step, index) => (
+            <label>English Title</label>
+            <input name="translation.english" value={formData.translation.english} onChange={handleChange} required />
+          </div>
+          <div className="form-group">
+            <label>Amharic Title</label>
+            <input name="translation.amharic" value={formData.translation.amharic} onChange={handleChange} required />
+          </div>
+          <div className="form-group">
+            <label>Oromo Title</label>
+            <input name="translation.oromo" value={formData.translation.oromo} onChange={handleChange} required />
+          </div>
+
+          {/* SIMPLIFICATION: Steps can only be added/edited after a guide is created. */}
+          {guide?.id && <StepsManager guideId={guide.id} />}
+          {!guide?.id && (
+              <div className="form-info">You must create a guide before you can add steps to it.</div>
+          )}
+
+          <div className="modal-actions">
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : (guide ? "Update Guide" : "Save Guide")}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+
+// =================================================================
+// NEW Steps Manager Component (for use inside GuideModal)
+// =================================================================
+const StepsManager = ({ guideId }) => {
+    const [steps, setSteps] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [isStepModalOpen, setStepModalOpen] = useState(false);
+    const [editingStep, setEditingStep] = useState(null);
+
+    const loadSteps = async () => {
+        try {
+            setLoading(true);
+            const data = await stepsAPI.getAll(guideId);
+            setSteps(data || []);
+        } catch (error) {
+            console.error(`Failed to load steps for guide ${guideId}:`, error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadSteps();
+    }, [guideId]);
+    
+    const handleAddStep = () => {
+        setEditingStep(null);
+        setStepModalOpen(true);
+    };
+
+    const handleEditStep = (step) => {
+        setEditingStep(step);
+        setStepModalOpen(true);
+    };
+
+    const handleDeleteStep = async (stepId) => {
+        if (window.confirm("Are you sure you want to delete this step?")) {
+            try {
+                await stepsAPI.delete(stepId);
+                await loadSteps(); // Refresh the list
+            } catch (error) {
+                console.error("Failed to delete step:", error);
+                alert("Failed to delete step.");
+            }
+        }
+    };
+    
+    const onStepSaveSuccess = async () => {
+        setStepModalOpen(false);
+        setEditingStep(null);
+        await loadSteps(); // Refresh the list
+    };
+
+    return (
+        <div className="steps-section">
+            <div className="steps-header">
+                <h3>Steps ({steps.length})</h3>
+                <button type="button" className="btn btn-secondary" onClick={handleAddStep}>Add Step</button>
+            </div>
+            {loading ? <p>Loading steps...</p> : (
+                <div className="steps-list-form">
+                {steps.map((step) => (
                   <div key={step.id} className="step-item-form">
                     <div className="step-info">
-                      <span className="step-number">{index + 1}</span>
+                      <span className="step-number">{step.order}</span>
                       <span className="step-title">{step.title}</span>
                     </div>
                     <div className="step-actions">
-                      <button type="button" className="action-btn edit" onClick={() => handleEditStep(step)}>
-                        ✏️
-                      </button>
-                      <button type="button" className="action-btn delete" onClick={() => handleDeleteStep(step.id)}>
-                        🗑️
-                      </button>
+                      <button type="button" title="Edit Step" className="action-btn edit" onClick={() => handleEditStep(step)}>✏️</button>
+                      <button type="button" title="Delete Step" className="action-btn delete" onClick={() => handleDeleteStep(step.id)}>🗑️</button>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
+            )}
+            {isStepModalOpen && (
+                <StepModal step={editingStep} guideId={guideId} onClose={() => setStepModalOpen(false)} onSaveSuccess={onStepSaveSuccess} />
+            )}
+        </div>
+    );
+};
 
-          <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary">
-              {guide ? "Update Guide" : "Add Guide"}
-            </button>
-          </div>
-        </form>
-
-        {showStepModal && (
-          <StepModal
-            step={editingStep}
-            onClose={() => setShowStepModal(false)}
-            onSave={handleSaveStep}
-            guideId={guide?.id}
-            initialFiles={editingStep?.files}
-          />
-        )}
-      </div>
-    </div>
-  )
-}
-
-const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
-  const modalRef = useRef(null)
+// =================================================================
+// Step Add/Edit Modal
+// =================================================================
+const StepModal = ({ step, guideId, onClose, onSaveSuccess }) => {
   const [formData, setFormData] = useState({
     title: step?.title || "",
     description: step?.description || "",
+    order: step?.order || 1,
     text: {
       english: step?.text?.english || "",
       amharic: step?.text?.amharic || "",
@@ -628,274 +422,128 @@ const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
     arabic: step?.arabic || "",
     duration: step?.duration || "",
     location: step?.location || "",
-  })
-  const [files, setFiles] = useState({
-    image: initialFiles?.image || null,
-    audio: initialFiles?.audio || null,
-    video: initialFiles?.video || null,
-  })
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (modalRef.current && event.target === modalRef.current) {
-        onClose()
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [onClose])
+  });
+  const [files, setFiles] = useState({ image: null, audio: null, video: null });
+  const [isSubmitting, setSubmitting] = useState(false);
 
   const handleChange = (e) => {
-    const { name, value } = e.target
+    const { name, value, type } = e.target;
     if (name.startsWith("text.")) {
-      const lang = name.split(".")[1]
-      setFormData({
-        ...formData,
-        text: {
-          ...formData.text,
-          [lang]: value,
-        },
-      })
+      const lang = name.split(".")[1];
+      setFormData(prev => ({ ...prev, text: { ...prev.text, [lang]: value } }));
     } else {
-      setFormData({ ...formData, [name]: value })
+      setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseInt(value, 10) || 1 : value }));
     }
-  }
-
+  };
+  
   const handleFileChange = (e) => {
-    const { name, files: fileList } = e.target
-    setFiles({
-      ...files,
-      [name]: fileList[0] || null,
-    })
-  }
+    const { name, files: fileList } = e.target;
+    setFiles(prev => ({ ...prev, [name]: fileList[0] || null }));
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if ((!files.image || files.image.size === 0) && !step?.image) {
-      alert('Please provide an image for the step.')
-      return
+    if (!files.image && !step?.image) {
+      alert("An image is required for the step.");
+      return;
     }
+    setSubmitting(true);
 
-    const submitData = new FormData()
-    submitData.append('title', formData.title)
-    submitData.append('description', formData.description)
-    submitData.append('text', JSON.stringify(formData.text))
-    submitData.append('arabic', formData.arabic || '')
-    submitData.append('duration', formData.duration)
-    submitData.append('location', formData.location || '')
+    const submitData = new FormData();
+    submitData.append('title', formData.title);
+    submitData.append('description', formData.description);
+    submitData.append('order', formData.order);
+    submitData.append('duration', formData.duration);
+    submitData.append('guideId', guideId);
+    submitData.append('arabic', formData.arabic || '');
+    submitData.append('location', formData.location || '');
 
-    if (guideId) {
-      submitData.append('guideId', guideId)
+    // FIX: Stringify the text object for multipart/form-data
+    submitData.append('text', JSON.stringify(formData.text));
+
+    if (files.image) submitData.append('image', files.image);
+    if (files.audio) submitData.append('audio', files.audio);
+    if (files.video) submitData.append('video', files.video);
+
+    try {
+      if (step) {
+        await stepsAPI.update(step.id, submitData);
+      } else {
+        await stepsAPI.create(submitData);
+      }
+      onSaveSuccess();
+    } catch (error) {
+      console.error("Failed to save step:", error.response?.data || error.message);
+      const errorMessage = error.response?.data?.message?.[0] || 'Failed to save step.';
+      alert(errorMessage);
+    } finally {
+      setSubmitting(false);
     }
-
-    if (files.image) {
-      submitData.append('image', files.image)
-    }
-
-    if (files.audio) {
-      submitData.append('audio', files.audio)
-    }
-
-    if (files.video) {
-      submitData.append('video', files.video)
-    }
-
-    await onSave(submitData, files)
-  }
+  };
 
   return (
-    <div className="modal-overlay" ref={modalRef}>
+    <div className="modal-overlay nested">
       <div className="modal-content">
         <div className="modal-header">
           <h2>{step ? "Edit Step" : "Add New Step"}</h2>
-          <button className="close-btn" onClick={onClose}>
-            ×
-          </button>
+          <button className="close-btn" onClick={onClose}>×</button>
         </div>
-
         <form onSubmit={handleSubmit} className="step-form">
           <div className="form-group">
             <label>Title</label>
-            <input 
-              type="text" 
-              name="title" 
-              value={formData.title} 
-              onChange={handleChange} 
-              className="input" 
-              required 
-            />
+            <input type="text" name="title" value={formData.title} onChange={handleChange} required />
           </div>
-
           <div className="form-group">
-            <label>Description</label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              className="input"
-              rows="2"
-              required
-            />
+            <label>Short Description</label>
+            <textarea name="description" value={formData.description} onChange={handleChange} rows="2" required />
           </div>
-
-          <div className="translations-section">
-            <h3>Detailed Text Translations</h3>
-            
-            <div className="form-group">
-              <label>English</label>
-              <textarea
-                name="text.english"
-                value={formData.text.english}
-                onChange={handleChange}
-                className="input"
-                rows="3"
-                placeholder="Detailed explanation in English..."
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Amharic</label>
-              <textarea
-                name="text.amharic"
-                value={formData.text.amharic}
-                onChange={handleChange}
-                className="input"
-                rows="3"
-                placeholder="Detailed explanation in Amharic..."
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Oromo</label>
-              <textarea
-                name="text.oromo"
-                value={formData.text.oromo}
-                onChange={handleChange}
-                className="input"
-                rows="3"
-                placeholder="Detailed explanation in Oromo..."
-                required
-              />
-            </div>
-          </div>
-
           <div className="form-group">
-            <label>Arabic Text</label>
-            <textarea
-              name="arabic"
-              value={formData.arabic}
-              onChange={handleChange}
-              className="input arabic-input"
-              rows="2"
-              placeholder="Arabic text (optional)"
-            />
+            <label>Order</label>
+            <input type="number" name="order" value={formData.order} onChange={handleChange} min="1" required />
           </div>
-
           <div className="form-group">
             <label>Image</label>
-            <input 
-              type="file" 
-              name="image" 
-              accept="image/*" 
-              onChange={handleFileChange} 
-              className="input"
-              required={!step?.image}
-            />
-            {files.image?.name && (
-              <div className="current-file">Selected: {files.image.name}</div>
-            )}
-            {step?.image && !files.image && (
-              <div className="current-file">
-                Current: <img src={getAssetUrl(step.image)} alt="Current" style={{ width: "100px", marginTop: "8px" }} />
-              </div>
-            )}
+            <input type="file" name="image" accept="image/*" onChange={handleFileChange} required={!step?.image} />
+            {step?.image && !files.image && <div className="current-file">Current: <img src={getAssetUrl(step.image)} alt="Current" /></div>}
           </div>
-
+          <h3>Detailed Text Translations</h3>
           <div className="form-group">
-            <label>Audio (optional)</label>
-            <input
-              type="file"
-              name="audio"
-              accept="audio/*"
-              onChange={handleFileChange}
-              className="input"
-            />
-            {files.audio?.name && (
-              <div className="current-file">Selected: {files.audio.name}</div>
-            )}
-            {step?.audio && !files.audio && (
-              <div className="current-file">
-                Current:
-                <audio
-                  controls
-                  src={getAssetUrl(step.audio)}
-                  style={{ width: "100%", marginTop: "8px" }}
-                >
-                  Your browser does not support the audio element.
-                </audio>
-              </div>
-            )}
+            <label>English</label>
+            <textarea name="text.english" value={formData.text.english} onChange={handleChange} rows="3" required />
           </div>
-
           <div className="form-group">
-            <label>Video (optional)</label>
-            <input
-              type="file"
-              name="video"
-              accept="video/*"
-              onChange={handleFileChange}
-              className="input"
-            />
-            {files.video?.name && (
-              <div className="current-file">Selected: {files.video.name}</div>
-            )}
-            {step?.video && !files.video && (
-              <div className="current-file">
-                Current:
-                <video
-                  controls
-                  src={getAssetUrl(step.video)}
-                  style={{ width: "100%", marginTop: "8px" }}
-                >
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-            )}
+            <label>Amharic</label>
+            <textarea name="text.amharic" value={formData.text.amharic} onChange={handleChange} rows="3" required />
           </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Duration</label>
-              <input
-                type="text"
-                name="duration"
-                value={formData.duration}
-                onChange={handleChange}
-                className="input"
-                placeholder="e.g., 5 minutes"
-                required
-              />
-            </div>
+          <div className="form-group">
+            <label>Oromo</label>
+            <textarea name="text.oromo" value={formData.text.oromo} onChange={handleChange} rows="3" required />
           </div>
-
+          <div className="form-group">
+            <label>Duration</label>
+            <input type="text" name="duration" value={formData.duration} onChange={handleChange} placeholder="e.g., 20 minutes" required />
+          </div>
+          <div className="form-group">
+            <label>Audio (Optional)</label>
+            <input type="file" name="audio" accept="audio/*" onChange={handleFileChange} />
+             {step?.audio && !files.audio && <div className="current-file"><audio controls src={getAssetUrl(step.audio)} /></div>}
+          </div>
+           <div className="form-group">
+            <label>Video (Optional)</label>
+            <input type="file" name="video" accept="video/*" onChange={handleFileChange} />
+             {step?.video && !files.video && <div className="current-file"><video controls src={getAssetUrl(step.video)} /></div>}
+          </div>
           <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary">
-              {step ? "Update Step" : "Add Step"}
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : (step ? 'Update Step' : 'Add Step')}
             </button>
           </div>
         </form>
       </div>
     </div>
-  )
-}
+  );
+};
 
 export default UmrahGuides;

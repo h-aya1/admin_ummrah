@@ -8,6 +8,13 @@ import './chat.css';
 const API_BASE_URL = 'http://69.62.109.18:3001';
 const SOCKET_URL = 'http://69.62.109.18:3001/chat';
 
+// --- Helper Components ---
+const AttachmentIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+  </svg>
+);
+
 // --- Main Chat Component ---
 const Chat = () => {
   const { groups, authToken, currentUser, refreshGroups } = useAppContext();
@@ -117,26 +124,18 @@ const Chat = () => {
       alert(`An error occurred: ${error.message}`);
     });
 
-    socket.on('newMessage', (message) => {
-      setLocalMessages((prev) => [...prev, message]);
-    });
-
+    socket.on('newMessage', (message) => setLocalMessages((prev) => [...prev, message]));
     socket.on('messageUpdated', (updatedMessage) => {
       setLocalMessages((prev) => prev.map((msg) => (msg.id === updatedMessage.id ? updatedMessage : msg)));
     });
-
     socket.on('messageDeleted', (deletedMessage) => {
       setLocalMessages((prev) => prev.map((msg) => (msg.id === deletedMessage.id ? deletedMessage : msg)));
     });
-
     socket.on('userTyping', ({ username, isTyping }) => {
       setTypingUsers((prev) => {
         const newTypingUsers = { ...prev };
-        if (isTyping) {
-          newTypingUsers[username] = true;
-        } else {
-          delete newTypingUsers[username];
-        }
+        if (isTyping) newTypingUsers[username] = true;
+        else delete newTypingUsers[username];
         return newTypingUsers;
       });
     });
@@ -164,9 +163,6 @@ const Chat = () => {
     setImagePreview(null);
   };
 
-  // ===================================================================
-  // === THIS IS THE UPDATED FUNCTION FOR DIRECT CLIENT-SIDE UPLOAD  ===
-  // ===================================================================
   const handleSendMessage = async (e) => {
     e.preventDefault();
     const hasText = newMessage.trim().length > 0;
@@ -180,13 +176,9 @@ const Chat = () => {
     const optimisticMessage = {
       id: tempId,
       content: hasText ? newMessage.trim() : null,
-      imageUrl: imagePreview, // Show local preview immediately
+      imageUrl: imagePreview,
       createdAt: new Date().toISOString(),
-      sender: {
-        id: currentUser.id,
-        name: currentUser.name,
-        role: currentUser.role,
-      },
+      sender: { id: currentUser.id, name: currentUser.name, role: currentUser.role },
       isSending: true,
     };
 
@@ -202,18 +194,13 @@ const Chat = () => {
         setIsUploading(true);
         const token = localStorage.getItem('adminToken');
 
-        // Step 1: Get the signature from your backend
         const sigResponse = await fetch(`${API_BASE_URL}/chat/upload-signature`, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });
         if (!sigResponse.ok) throw new Error('Could not get upload signature from your server.');
         const sigData = await sigResponse.json();
 
-        // Step 2: Prepare form data and upload the file DIRECTLY to Cloudinary
         const cloudinaryFormData = new FormData();
         cloudinaryFormData.append('file', imageFile);
         cloudinaryFormData.append('api_key', sigData.apiKey);
@@ -222,46 +209,34 @@ const Chat = () => {
         cloudinaryFormData.append('folder', sigData.folder);
 
         const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${sigData.cloudName}/image/upload`;
-
-        const cloudinaryResponse = await fetch(cloudinaryUrl, {
-          method: 'POST',
-          body: cloudinaryFormData,
-        });
+        const cloudinaryResponse = await fetch(cloudinaryUrl, { method: 'POST', body: cloudinaryFormData });
 
         if (!cloudinaryResponse.ok) throw new Error('Cloudinary upload failed.');
         const cloudinaryResult = await cloudinaryResponse.json();
         
-        uploadedImageUrl = cloudinaryResult.secure_url; // Get the final URL
+        uploadedImageUrl = cloudinaryResult.secure_url;
         setIsUploading(false);
       }
 
-      // Step 3: Send the final payload (with text and/or the new URL) via WebSocket
       const payload = {
         content: hasText ? textToSend : undefined,
         imageUrl: uploadedImageUrl,
       };
 
       socketRef.current.emit('sendMessage', payload, (response) => {
-        if (response && response.status === 'ok' && response.data) {
-          // Replace the optimistic message with the real one from the server
+        if (response?.status === 'ok' && response.data) {
           setLocalMessages((prev) => prev.map((msg) => (msg.id === tempId ? response.data : msg)));
         } else {
-          // Handle send failure
           console.error('Failed to send message:', response?.error);
           alert(`Failed to send message: ${response?.error || 'Unknown server error'}`);
-          setLocalMessages((prev) =>
-            prev.map((msg) => (msg.id === tempId ? { ...msg, isSending: false, error: true } : msg))
-          );
+          setLocalMessages((prev) => prev.map((msg) => (msg.id === tempId ? { ...msg, isSending: false, error: true } : msg)));
         }
       });
     } catch (error) {
       console.error('Error sending message:', error);
       alert(error.message);
       setIsUploading(false);
-      // Mark the optimistic message as failed
-      setLocalMessages((prev) =>
-        prev.map((msg) => (msg.id === tempId ? { ...msg, isSending: false, error: true } : msg))
-      );
+      setLocalMessages((prev) => prev.map((msg) => (msg.id === tempId ? { ...msg, isSending: false, error: true } : msg)));
     } finally {
       setSendingMessage(false);
     }
@@ -280,9 +255,7 @@ const Chat = () => {
   const handleTyping = () => {
     if (!socketRef.current) return;
     socketRef.current.emit('startTyping');
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
       socketRef.current.emit('stopTyping');
     }, 2000);
@@ -294,7 +267,7 @@ const Chat = () => {
     }
   };
 
-  const typingDisplay = Object.keys(typingUsers).join(', ');
+  const typingDisplay = Object.keys(typingUsers).filter(name => name !== currentUser?.name).join(', ');
 
   // --- Render Logic ---
   if (loading) {
@@ -308,19 +281,17 @@ const Chat = () => {
 
   return (
     <div className="chat-page">
-      <div className="page-header">
-        <h1>Group Chat</h1>
-      </div>
+      <h1 className="chat-page-title">Group Chat</h1>
       <div className="chat-container">
         <div className="groups-sidebar">
           <h3>Groups ({groups.length})</h3>
-          {groups.length === 0 ? (
-            <div className="no-groups">
-              <p>No groups available.</p>
-            </div>
-          ) : (
-            <div className="groups-list">
-              {groups.map((group) => (
+          <div className="groups-list">
+            {groups.length === 0 ? (
+              <div className="no-groups">
+                <p>No groups available.</p>
+              </div>
+            ) : (
+              groups.map((group) => (
                 <div
                   key={group.id}
                   className={`group-item ${selectedGroup?.id === group.id ? 'selected' : ''}`}
@@ -331,9 +302,9 @@ const Chat = () => {
                     <div className="group-amir">Amir: {group.amir}</div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </div>
         <div className="chat-main">
           {selectedGroup ? (
@@ -341,23 +312,30 @@ const Chat = () => {
               <div className="chat-header">
                 <div className="chat-info">
                   <h2>{selectedGroup.name}</h2>
-                  <div className={`connection-status ${connectionStatus}`}>
-                    <span className="status-indicator"></span>
-                    <span className="status-text">{connectionStatus}</span>
-                  </div>
                   <p>Amir: {selectedGroup.amir}</p>
+                </div>
+                <div className={`connection-status ${connectionStatus}`}>
+                  <span className="status-indicator"></span>
+                  <span className="status-text">{connectionStatus}</span>
                 </div>
               </div>
               <div className="messages-container">
                 <div className="messages-list" ref={messagesContainerRef}>
-                  {localMessages.map((message) => (
-                    <MessageItem
-                      key={message.id}
-                      message={message}
-                      onEdit={handleEditMessage}
-                      onDelete={handleDeleteMessage}
-                    />
-                  ))}
+                  {localMessages.length > 0 ? (
+                    localMessages.map((message) => (
+                      <MessageItem
+                        key={message.id}
+                        message={message}
+                        onEdit={handleEditMessage}
+                        onDelete={handleDeleteMessage}
+                      />
+                    ))
+                  ) : (
+                    <div className="no-messages-placeholder">
+                      <h3>No messages yet</h3>
+                      <p>Be the first to start the conversation!</p>
+                    </div>
+                  )}
                 </div>
                 <div className="typing-indicator-container">
                   {typingDisplay && <span>{typingDisplay} is typing...</span>}
@@ -373,7 +351,7 @@ const Chat = () => {
                           </button>
                         </div>
                       )}
-                      <div className="input-wrapper">
+                       <div className="input-wrapper">
                         <input
                           type="file"
                           ref={fileInputRef}
@@ -383,11 +361,12 @@ const Chat = () => {
                         />
                         <button
                           type="button"
-                          className="btn-attach"
+                          className="btn btn-attach"
                           onClick={() => fileInputRef.current.click()}
                           disabled={sendingMessage || isUploading}
+                          title="Attach an image"
                         >
-                          📎
+                          <AttachmentIcon />
                         </button>
                         <textarea
                           value={newMessage}
@@ -395,10 +374,10 @@ const Chat = () => {
                             setNewMessage(e.target.value);
                             handleTyping();
                           }}
-                          onKeyPress={handleKeyPress}
+                          onKeyDown={handleKeyPress}
                           placeholder="Type your message..."
                           className="message-input"
-                          rows={2}
+                          rows={1}
                           disabled={sendingMessage || isUploading}
                         />
                         <button
@@ -419,7 +398,8 @@ const Chat = () => {
             </>
           ) : (
             <div className="no-group-selected">
-              <h3>Select a group to view chat</h3>
+              <h3>Select a group to start chatting</h3>
+              <p>Your conversations will appear here.</p>
             </div>
           )}
         </div>
