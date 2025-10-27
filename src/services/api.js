@@ -283,6 +283,10 @@ export const stepsAPI = {
   },
 
   async create(formData) {
+    // Ensure image field exists even if empty
+    if (!formData.has('image')) {
+      formData.append('image', '');
+    }
     return apiCallWithFiles('/guides/steps', {
       method: 'POST',
       body: formData,

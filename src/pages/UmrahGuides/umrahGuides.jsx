@@ -82,6 +82,15 @@ const UmrahGuides = () => {
       <div className="guides-grid">
         {guides.map((guide) => (
           <div key={guide.id} className="guide-card">
+            {guide.image && (
+              <div className="guide-image-container">
+                <img 
+                  src={`http://localhost:3000/${guide.image}`} 
+                  alt={guide.title} 
+                  className="guide-image"
+                />
+              </div>
+            )}
             <div className="guide-header">
               <div className="guide-info">
                 <h3 className="guide-title">{guide.title}</h3>
@@ -191,23 +200,6 @@ const GuideDetailModal = ({ guide, onClose }) => {
                     </div>
                   )}
                   {step.arabic && <div className="step-arabic">{step.arabic}</div>}
-                  {step.image && (
-                    <div className="step-image">
-                      <img src={step.image} alt={step.title} style={{ width: "100%", maxWidth: "300px", borderRadius: "8px", marginTop: "8px" }} />
-                    </div>
-                  )}
-                  {step.video && (
-                    <div className="step-video">
-                      <video controls src={step.video} style={{ width: "100%", maxWidth: "400px", borderRadius: "8px", marginTop: "8px" }} />
-                    </div>
-                  )}
-                  {step.audio && (
-                    <div className="step-audio">
-                      <audio controls src={step.audio} style={{ width: "100%", marginTop: "8px" }}>
-                        Your browser does not support the audio element.
-                      </audio>
-                    </div>
-                  )}
                   <div className="step-meta">
                     <span className="step-duration">⏱️ {step.duration}</span>
                     {step.location && (
@@ -239,8 +231,6 @@ const GuideModal = ({ guide, onClose, onSave }) => {
   })
   const [files, setFiles] = useState({
     image: null,
-    video: null,
-    audio: null,
   })
   const [showStepModal, setShowStepModal] = useState(false)
   const [editingStep, setEditingStep] = useState(null)
@@ -318,6 +308,11 @@ const GuideModal = ({ guide, onClose, onSave }) => {
   const handleSaveStep = async (stepData, stepFiles) => {
     try {
       if (guide) {
+        const hasIncomingImage = stepData.get('image');
+        if (!editingStep && !hasIncomingImage) {
+          alert('Please provide an image for the step.');
+          return;
+        }
         if (editingStep) {
           await stepsAPI.update(editingStep.id, stepData)
         } else {
@@ -333,6 +328,11 @@ const GuideModal = ({ guide, onClose, onSave }) => {
           arabic: stepData.get('arabic') || '',
           duration: stepData.get('duration'),
           location: stepData.get('location') || '',
+        }
+
+        if (!stepFiles?.image && !editingStep?.files?.image) {
+          alert('Please provide an image for the step.');
+          return;
         }
 
         if (editingStep) {
@@ -368,7 +368,7 @@ const GuideModal = ({ guide, onClose, onSave }) => {
     // Build clean payload for JSON when no files are selected
     const parsedOrder = parseInt(formData.order, 10);
     const safeOrder = Number.isFinite(parsedOrder) && parsedOrder >= 1 ? parsedOrder : 1;
-    const hasFiles = Boolean(files.image || files.video || files.audio);
+    const hasFiles = Boolean(files.image);
     const jsonPayload = {
       title: formData.title,
       description: formData.description || '',
@@ -390,8 +390,6 @@ const GuideModal = ({ guide, onClose, onSave }) => {
       submitData.append('translation[amharic]', jsonPayload.translation.amharic);
       submitData.append('translation[oromo]', jsonPayload.translation.oromo);
       if (files.image) submitData.append('image', files.image);
-      if (files.video) submitData.append('video', files.video);
-      if (files.audio) submitData.append('audio', files.audio);
     }
 
     try {
@@ -420,8 +418,6 @@ const GuideModal = ({ guide, onClose, onSave }) => {
                     stepData.append('guideId', guideId);
 
                     if (step.files?.image) stepData.append('image', step.files.image);
-                    if (step.files?.video) stepData.append('video', step.files.video);
-                    if (step.files?.audio) stepData.append('audio', step.files.audio);
 
                     await stepsAPI.create(stepData);
                 }
@@ -533,36 +529,8 @@ const GuideModal = ({ guide, onClose, onSave }) => {
             />
             {guide?.image && !files.image && (
               <div className="current-file">
-                Current: <img src={guide.image} alt="Current" style={{ width: "100px", marginTop: "8px" }} />
+                Current: <img src={`http://localhost:3000/${guide.image}`} alt="Current" style={{ width: "100px", marginTop: "8px" }} />
               </div>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label>Video (Optional)</label>
-            <input 
-              type="file" 
-              name="video" 
-              accept="video/*" 
-              onChange={handleFileChange} 
-              className="input" 
-            />
-            {guide?.video && !files.video && (
-              <div className="current-file">Current video: {guide.video}</div>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label>Audio (Optional)</label>
-            <input 
-              type="file" 
-              name="audio" 
-              accept="audio/*" 
-              onChange={handleFileChange} 
-              className="input" 
-            />
-            {guide?.audio && !files.audio && (
-              <div className="current-file">Current audio: {guide.audio}</div>
             )}
           </div>
 
@@ -635,8 +603,6 @@ const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
   })
   const [files, setFiles] = useState({
     image: initialFiles?.image || null,
-    video: initialFiles?.video || null,
-    audio: initialFiles?.audio || null,
   })
 
   useEffect(() => {
@@ -678,7 +644,12 @@ const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
+    if ((!files.image || files.image.size === 0) && !step?.image) {
+      alert('Please provide an image for the step.')
+      return
+    }
+
     const submitData = new FormData()
     submitData.append('title', formData.title)
     submitData.append('description', formData.description)
@@ -686,14 +657,14 @@ const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
     submitData.append('arabic', formData.arabic || '')
     submitData.append('duration', formData.duration)
     submitData.append('location', formData.location || '')
-    
+
     if (guideId) {
       submitData.append('guideId', guideId)
     }
 
-    if (files.image) submitData.append('image', files.image)
-    if (files.video) submitData.append('video', files.video)
-    if (files.audio) submitData.append('audio', files.audio)
+    if (files.image) {
+      submitData.append('image', files.image)
+    }
 
     await onSave(submitData, files)
   }
@@ -796,40 +767,12 @@ const StepModal = ({ step, onClose, onSave, guideId, initialFiles }) => {
               accept="image/*" 
               onChange={handleFileChange} 
               className="input"
-              required 
+              required={!step?.image}
             />
             {step?.image && !files.image && (
               <div className="current-file">
-                Current: <img src={step.image} alt="Current" style={{ width: "100px", marginTop: "8px" }} />
+                Current: <img src={`http://localhost:3000/${step.image}`} alt="Current" style={{ width: "100px", marginTop: "8px" }} />
               </div>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label>Video (Optional)</label>
-            <input 
-              type="file" 
-              name="video" 
-              accept="video/*" 
-              onChange={handleFileChange} 
-              className="input" 
-            />
-            {step?.video && !files.video && (
-              <div className="current-file">Current video: {step.video}</div>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label>Audio (Optional)</label>
-            <input 
-              type="file" 
-              name="audio" 
-              accept="audio/*" 
-              onChange={handleFileChange} 
-              className="input" 
-            />
-            {step?.audio && !files.audio && (
-              <div className="current-file">Current audio: {step.audio}</div>
             )}
           </div>
 
