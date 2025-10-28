@@ -216,17 +216,19 @@ export const placesAPI = {
     return apiCall(`/places/${id}`);
   },
 
-  async create(payload) {
-    return apiCall('/places', {
+  // Use apiCallWithFiles and expect formData
+  async create(formData) {
+    return apiCallWithFiles('/places', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: formData,
     });
   },
 
-  async update(id, payload) {
-    return apiCall(`/places/${id}`, {
+  // Use apiCallWithFiles and expect formData
+  async update(id, formData) {
+    return apiCallWithFiles(`/places/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(payload),
+      body: formData,
     });
   },
 
