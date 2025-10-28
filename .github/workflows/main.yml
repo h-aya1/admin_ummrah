@@ -32,7 +32,7 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: dist/
-          server-dir: ummrah-admin/
+          server-dir: /home/skylinkictcom/skylinkict.com/ummrah-admin/
           dangerous-clean-slate: false
 
           exclude: |
