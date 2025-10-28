@@ -34,7 +34,7 @@ jobs:
           local-dir: dist/
           server-dir: ummrah-admin/
           dangerous-clean-slate: true
-          protocol: ftps               
+          protocol: ftp              
           port: 21 
 
           exclude: |
