@@ -1,7 +1,7 @@
 // src/contexts/AppContext.js
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { authAPI, usersAPI, groupsAPI, duasAPI } from "../services/api"
+import { authAPI, usersAPI, groupsAPI, duasAPI, UNAUTHORIZED_EVENT } from "../services/api"
 // Firebase imports for push notifications
 import { requestForToken, onMessageListener } from "../firebase"
 
@@ -187,6 +187,18 @@ export const AppProvider = ({ children }) => {
       loadInitialData();
     }
   }, [loadInitialData]);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      logout();
+    };
+
+    window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
+
+    return () => {
+      window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
+    };
+  }, [logout]);
 
   useEffect(() => {
     const totalUsers = users.length

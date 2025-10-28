@@ -1,4 +1,6 @@
 // API service with authentication
+export const UNAUTHORIZED_EVENT = 'app:unauthorized';
+
 export const API_BASE_URL =
   window.location.hostname === 'localhost'
     ? 'http://69.62.109.18:3001'
@@ -19,6 +21,14 @@ export const getAssetUrl = (path) => {
 const getAuthHeaders = () => {
   const token = localStorage.getItem('adminToken');
   return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
+
+const dispatchUnauthorized = () => {
+  try {
+    window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
+  } catch (error) {
+    console.error('Failed to dispatch unauthorized event', error);
+  }
 };
 
 // Helper for API calls with file uploads
@@ -48,6 +58,9 @@ const apiCallWithFiles = async (endpoint, options = {}) => {
       // ignore
     }
     const statusInfo = `${response.status} ${response.statusText}`;
+    if (response.status === 401) {
+      dispatchUnauthorized();
+    }
     throw new Error(message ? `${statusInfo} - ${message}` : statusInfo);
   }
 
@@ -85,6 +98,9 @@ const apiCall = async (endpoint, options = {}) => {
       // ignore
     }
     const statusInfo = `${response.status} ${response.statusText}`;
+    if (response.status === 401) {
+      dispatchUnauthorized();
+    }
     throw new Error(message ? `${statusInfo} - ${message}` : statusInfo);
   }
 
