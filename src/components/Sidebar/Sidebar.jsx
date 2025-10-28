@@ -20,24 +20,50 @@ const Sidebar = () => {
     checkMobile()
     window.addEventListener('resize', checkMobile)
 
-    // Listen for mobile menu toggle from topbar
+    return () => {
+      window.removeEventListener('resize', checkMobile)
+    }
+  }, [])
+
+  useEffect(() => {
     const handleMobileMenuToggle = () => {
-      if (isMobile) {
-        setMobileOpen(!mobileOpen)
-      }
+      setMobileOpen((prev) => (isMobile ? !prev : prev))
     }
 
     window.addEventListener('mobileMenuToggle', handleMobileMenuToggle)
 
     return () => {
-      window.removeEventListener('resize', checkMobile)
       window.removeEventListener('mobileMenuToggle', handleMobileMenuToggle)
+    }
+  }, [isMobile])
+
+  useEffect(() => {
+    if (!isMobile && mobileOpen) {
+      setMobileOpen(false)
     }
   }, [isMobile, mobileOpen])
 
+  useEffect(() => {
+    if (isMobile) {
+      document.body.style.overflow = mobileOpen ? 'hidden' : ''
+    } else {
+      document.body.style.overflow = ''
+    }
+
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [mobileOpen, isMobile])
+
+  useEffect(() => {
+    if (isMobile) {
+      setMobileOpen(false)
+    }
+  }, [location.pathname, isMobile])
+
   const handleToggle = () => {
     if (isMobile) {
-      setMobileOpen(!mobileOpen)
+      setMobileOpen((prev) => !prev)
     } else {
       toggleSidebar()
     }
@@ -103,13 +129,16 @@ const Sidebar = () => {
 
   return (
     <>
-      {isMobile && mobileOpen && (
+      {isMobile && (
         <div
-          className="mobile-overlay active"
+          className={`mobile-overlay ${mobileOpen ? 'active' : ''}`}
           onClick={() => setMobileOpen(false)}
         />
       )}
-      <div className={`sidebar ${sidebarCollapsed && !isMobile ? "collapsed" : ""} ${mobileOpen ? "mobile-open" : ""}`}>
+      <div
+        className={`sidebar ${sidebarCollapsed && !isMobile ? "collapsed" : ""} ${mobileOpen ? "mobile-open" : ""}`}
+        aria-hidden={isMobile && !mobileOpen}
+      >
         <div className="sidebar-header">
           <div className="logo">
             <img src={HanimLogo} alt="Hanim Tour & Travel" className="logo-image" style={{ height: '50px' }} />
@@ -120,12 +149,17 @@ const Sidebar = () => {
               </div>
             )}
           </div>
-          <button className="toggle-btn" onClick={handleToggle}>
+          <button
+            className="toggle-btn"
+            onClick={handleToggle}
+            aria-label={isMobile ? (mobileOpen ? 'Close navigation' : 'Open navigation') : sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={isMobile ? mobileOpen : !sidebarCollapsed}
+          >
             {isMobile ? (mobileOpen ? '✕' : '☰') : (sidebarCollapsed ? "→" : "←")}
           </button>
         </div>
 
-      <nav className="sidebar-nav">
+      <nav className="sidebar-nav" role="navigation">
         {menuItems.map((item) => (
           <Link
             key={item.path}

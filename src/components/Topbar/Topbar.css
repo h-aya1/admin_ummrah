@@ -1,3 +1,4 @@
+
 .topbar {
   height: 70px;
   background-color: var(--bg-secondary);
@@ -13,9 +14,14 @@
 
 .topbar-left {
   display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.page-info {
+  display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-left: 50px; /* Make space for mobile menu button */
+  gap: 4px;
 }
 
 .mobile-menu-btn {
@@ -27,11 +33,7 @@
   padding: 8px;
   border-radius: 4px;
   transition: background-color 0.2s ease;
-  position: absolute;
-  left: 15px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 1001;
+  display: none;
 }
 
 .mobile-menu-btn:hover {
@@ -68,7 +70,7 @@
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 1px;
+  gap: 12px;
 }
 
 .notification-wrapper,
@@ -312,26 +314,72 @@
   margin: 8px 0;
 }
 
+.topbar .profile-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+@media (max-width: 1024px) {
+  .topbar {
+    padding: 0 20px;
+  }
+}
+
 @media (max-width: 768px) {
   .topbar {
-    padding: 0 15px;
+    padding: 0 16px;
+  }
+
+  .topbar-left {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .mobile-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .page-title {
-    margin-left: 0; /* Reset margin on mobile - button is absolute positioned */
-    font-size: 15px;
+    font-size: 18px;
   }
 
-  .stats-summary {
-    display: none;
+  .breadcrumb {
+    font-size: 11px;
   }
 
-  .profile-info {
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .topbar .profile-info {
     display: none;
   }
 
   .notification-dropdown,
   .profile-dropdown {
-    min-width: 250px;
+    min-width: 240px;
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar {
+    padding: 0 12px;
+    height: 64px;
+  }
+
+  .page-title {
+    font-size: 16px;
+  }
+
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  .profile-btn {
+    padding: 2px 4px;
   }
 }
