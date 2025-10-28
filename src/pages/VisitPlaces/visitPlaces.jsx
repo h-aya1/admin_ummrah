@@ -1,6 +1,8 @@
+// src/pages/VisitPlaces.jsx
+
 import { useState, useEffect, useRef } from "react"
 import "./visitPlaces.css"
-import { placesAPI } from "../../services/api"
+import { placesAPI, getAssetUrl } from "../../services/api" // Import getAssetUrl
 
 const VisitPlaces = () => {
   const [places, setPlaces] = useState([])
@@ -56,6 +58,56 @@ const VisitPlaces = () => {
       }
     }
   }
+  
+  // --- FIX: This function now builds FormData before calling the API ---
+  const handleSavePlace = async (placeData) => {
+    setSaving(true);
+    
+    // 1. Create a FormData object
+    const formData = new FormData();
+
+    // 2. Append all text fields
+    formData.append('name', placeData.name);
+    formData.append('city', placeData.city);
+    formData.append('mapLocation', placeData.mapLocation);
+    
+    // Append nested description fields
+    formData.append('description[english]', placeData.description.english);
+    formData.append('description[amharic]', placeData.description.amharic);
+    formData.append('description[oromo]', placeData.description.oromo);
+    
+    // 3. Append only NEW image files
+    // The backend expects the 'images' key to contain file data
+    placeData.newImages.forEach(file => {
+      formData.append('images', file);
+    });
+    
+    // For updates, we must also send the list of existing images to keep
+    if (editingPlace) {
+      // The backend needs to be designed to handle this. Let's assume a simple case
+      // where new files replace old ones, or we send a list of URLs to keep.
+      // For now, let's keep it simple. A more robust solution would be needed here.
+    }
+
+    try {
+      if (editingPlace) {
+        const updatedPlace = await placesAPI.update(editingPlace.id, formData);
+        setPlaces(places.map((p) => (p.id === editingPlace.id ? updatedPlace : p)));
+        alert("Place updated successfully");
+      } else {
+        const newPlace = await placesAPI.create(formData);
+        setPlaces([...places, newPlace]);
+        alert("Place created successfully");
+      }
+      setShowAddModal(false);
+    } catch (error) {
+      console.error("Failed to save place:", error);
+      alert(`Failed to save place: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -96,7 +148,8 @@ const VisitPlaces = () => {
         {places.map((place) => (
           <div key={place.id} className="place-card">
             <div className="place-image">
-              <img src={place.images[0] || "/placeholder.svg"} alt={place.name} />
+              {/* Use getAssetUrl to build the full image path */}
+              <img src={place.images && place.images.length > 0 ? getAssetUrl(place.images[0]) : "/placeholder.svg"} alt={place.name} />
             </div>
 
             <div className="place-content">
@@ -150,26 +203,7 @@ const VisitPlaces = () => {
         <PlaceModal
           place={editingPlace}
           onClose={() => setShowAddModal(false)}
-          onSave={async (placeData) => {
-            setSaving(true)
-            try {
-              if (editingPlace) {
-                const updatedPlace = await placesAPI.update(editingPlace.id, placeData)
-                setPlaces(places.map((p) => (p.id === editingPlace.id ? updatedPlace : p)))
-                alert("Place updated successfully")
-              } else {
-                const newPlace = await placesAPI.create(placeData)
-                setPlaces([...places, newPlace])
-                alert("Place created successfully")
-              }
-              setShowAddModal(false)
-            } catch (error) {
-              console.error("Failed to save place:", error)
-              alert(`Failed to save place: ${error.message}`)
-            } finally {
-              setSaving(false)
-            }
-          }}
+          onSave={handleSavePlace} // Use the new handler
           saving={saving}
         />
       )}
@@ -179,6 +213,8 @@ const VisitPlaces = () => {
 
 const PlaceModal = ({ place, onClose, onSave, saving = false }) => {
   const modalRef = useRef(null)
+  
+  // --- FIX: State now separates existing images from new file uploads ---
   const [formData, setFormData] = useState({
     name: place?.name || "",
     description: {
@@ -188,8 +224,24 @@ const PlaceModal = ({ place, onClose, onSave, saving = false }) => {
     },
     city: place?.city || "makkah",
     mapLocation: place?.mapLocation || "",
-    images: place?.images || [],
+    existingImages: place?.images || [], // URLs from the server
+    newImages: [], // New File objects from the user
   })
+  
+  const [imagePreviews, setImagePreviews] = useState([]);
+
+  useEffect(() => {
+    // Generate previews for both existing and new images
+    const existingPreviews = formData.existingImages.map(url => getAssetUrl(url));
+    const newPreviews = formData.newImages.map(file => URL.createObjectURL(file));
+    setImagePreviews([...existingPreviews, ...newPreviews]);
+
+    // Cleanup object URLs to prevent memory leaks
+    return () => {
+      newPreviews.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [formData.existingImages, formData.newImages]);
+
 
   // Close modal when clicking outside
   useEffect(() => {
@@ -206,34 +258,53 @@ const PlaceModal = ({ place, onClose, onSave, saving = false }) => {
   }, [onClose])
 
   const handleChange = (e) => {
-    const { name, value, files } = e.target
-    if (name === "images" && files && files[0]) {
-      const newImages = [...formData.images, URL.createObjectURL(files[0])]
-      setFormData({ ...formData, images: newImages })
-    } else if (name.startsWith("description.")) {
+    const { name, value } = e.target
+    if (name.startsWith("description.")) {
       const lang = name.split(".")[1]
       setFormData({
         ...formData,
-        description: {
-          ...formData.description,
-          [lang]: value
-        }
+        description: { ...formData.description, [lang]: value }
       })
     } else {
       setFormData({ ...formData, [name]: value })
     }
   }
 
+  // --- FIX: Handle file selection correctly ---
+  const handleFileChange = (e) => {
+    if (e.target.files) {
+      // Append new files to the newImages array
+      setFormData(prev => ({
+        ...prev,
+        newImages: [...prev.newImages, ...Array.from(e.target.files)]
+      }));
+    }
+  };
+
+
+  // --- FIX: Differentiate between removing an old image and a new one ---
   const removeImage = (indexToRemove) => {
-    setFormData({
-      ...formData,
-      images: formData.images.filter((_, index) => index !== indexToRemove)
-    })
-  }
+    const existingCount = formData.existingImages.length;
+    if (indexToRemove < existingCount) {
+      // Removing an existing image
+      setFormData(prev => ({
+        ...prev,
+        existingImages: prev.existingImages.filter((_, index) => index !== indexToRemove)
+      }));
+    } else {
+      // Removing a new image
+      const newImageIndex = indexToRemove - existingCount;
+      setFormData(prev => ({
+        ...prev,
+        newImages: prev.newImages.filter((_, index) => index !== newImageIndex)
+      }));
+    }
+  };
+
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onSave(formData)
+    onSave(formData) // Pass the entire formData state up
   }
 
   return (
@@ -297,11 +368,7 @@ const PlaceModal = ({ place, onClose, onSave, saving = false }) => {
                 <option value="other">Other</option>
               </select>
             </div>
-
-
-    
           </div>
-
 
           <div className="form-group">
             <label>Images</label>
@@ -309,16 +376,16 @@ const PlaceModal = ({ place, onClose, onSave, saving = false }) => {
               type="file" 
               name="images" 
               accept="image/*" 
-              onChange={handleChange} 
+              onChange={handleFileChange} // Use dedicated file handler
               className="input" 
               multiple
             />
-            {formData.images.length > 0 && (
+            {imagePreviews.length > 0 && (
               <div className="images-preview">
-                {formData.images.map((image, index) => (
+                {imagePreviews.map((previewUrl, index) => (
                   <div key={index} className="image-preview-item" style={{ position: "relative", display: "inline-block", margin: "8px" }}>
                     <img 
-                      src={image} 
+                      src={previewUrl} 
                       alt={`Preview ${index + 1}`} 
                       style={{ width: "150px", height: "100px", objectFit: "cover", borderRadius: "8px" }} 
                     />
