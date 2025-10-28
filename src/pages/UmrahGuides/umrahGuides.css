@@ -17,6 +17,21 @@
   gap: 20px;
 }
 
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .guide-card {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -238,11 +253,37 @@
   gap: 20px;
 }
 
+.guide-form-section {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.guide-form-section + .guide-form-section {
+  margin-top: 4px;
+}
+
+.form-section-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .step-form {
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.file-input {
+  cursor: pointer;
+  background-color: var(--bg-primary);
 }
 
 .form-group {
@@ -275,6 +316,19 @@
   outline: none;
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.info-section {
+  border-style: dashed;
+}
+
+.form-info {
+  padding: 16px;
+  border-radius: 8px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .arabic-input {
@@ -411,6 +465,11 @@
     grid-template-columns: 1fr;
   }
 
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .guide-header {
     flex-direction: column;
     gap: 12px;
@@ -431,5 +490,27 @@
 
   .modal-content {
     max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .guide-card {
+    padding: 16px;
+  }
+
+  .guide-title {
+    font-size: 16px;
+  }
+
+  .guide-description {
+    font-size: 13px;
+  }
+
+  .guide-stats {
+    gap: 16px;
+  }
+
+  .step-item {
+    gap: 10px;
   }
 }

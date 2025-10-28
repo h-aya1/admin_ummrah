@@ -195,7 +195,6 @@ const GuideDetailModal = ({ guideId, onClose }) => {
   );
 };
 
-
 // =================================================================
 // Guide Add/Edit Modal
 // =================================================================
@@ -268,47 +267,112 @@ const GuideModal = ({ guide, onClose, onSaveSuccess }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="guide-form">
-          <div className="form-group">
-            <label>Title</label>
-            <input type="text" name="title" value={formData.title} onChange={handleChange} required />
+          <div className="guide-form-section">
+            <div className="form-row">
+              <div className="form-group">
+                <label>Title</label>
+                <input
+                  type="text"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleChange}
+                  className="input"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Order</label>
+                <input
+                  type="number"
+                  name="order"
+                  value={formData.order}
+                  onChange={handleChange}
+                  className="input"
+                  min="1"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Description (Optional)</label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                className="input"
+                rows="3"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Image</label>
+              <input
+                type="file"
+                name="image"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="input file-input"
+              />
+              {guide?.image && !imageFile && (
+                <div className="current-file">
+                  <span>Current:</span>
+                  <img src={getAssetUrl(guide.image)} alt="Current guide" />
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="form-group">
-            <label>Description (Optional)</label>
-            <textarea name="description" value={formData.description} onChange={handleChange} rows="3" />
-          </div>
-
-          <div className="form-group">
-            <label>Order</label>
-            <input type="number" name="order" value={formData.order} onChange={handleChange} min="1" required />
-          </div>
-          
-          <div className="form-group">
-            <label>Image</label>
-            <input type="file" name="image" accept="image/*" onChange={handleFileChange} />
-            {guide?.image && !imageFile && (
-              <div className="current-file">Current: <img src={getAssetUrl(guide.image)} alt="Current" /></div>
-            )}
-          </div>
-          
-          <h3>Guide Title Translations</h3>
-          <div className="form-group">
-            <label>English Title</label>
-            <input name="translation.english" value={formData.translation.english} onChange={handleChange} required />
-          </div>
-          <div className="form-group">
-            <label>Amharic Title</label>
-            <input name="translation.amharic" value={formData.translation.amharic} onChange={handleChange} required />
-          </div>
-          <div className="form-group">
-            <label>Oromo Title</label>
-            <input name="translation.oromo" value={formData.translation.oromo} onChange={handleChange} required />
+          <div className="guide-form-section">
+            <h3 className="form-section-title">Guide Title Translations</h3>
+            <div className="form-row">
+              <div className="form-group">
+                <label>English</label>
+                <input
+                  name="translation.english"
+                  value={formData.translation.english}
+                  onChange={handleChange}
+                  className="input"
+                  placeholder="English title"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Amharic</label>
+                <input
+                  name="translation.amharic"
+                  value={formData.translation.amharic}
+                  onChange={handleChange}
+                  className="input"
+                  placeholder="Amharic title"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Oromo</label>
+                <input
+                  name="translation.oromo"
+                  value={formData.translation.oromo}
+                  onChange={handleChange}
+                  className="input"
+                  placeholder="Oromo title"
+                  required
+                />
+              </div>
+            </div>
           </div>
 
           {/* SIMPLIFICATION: Steps can only be added/edited after a guide is created. */}
-          {guide?.id && <StepsManager guideId={guide.id} />}
-          {!guide?.id && (
-              <div className="form-info">You must create a guide before you can add steps to it.</div>
+          {guide?.id ? (
+            <div className="guide-form-section">
+              <StepsManager guideId={guide.id} />
+            </div>
+          ) : (
+            <div className="guide-form-section info-section">
+              <div className="form-info">
+                You must create a guide before you can add steps to it.
+              </div>
+            </div>
           )}
 
           <div className="modal-actions">
@@ -323,93 +387,86 @@ const GuideModal = ({ guide, onClose, onSaveSuccess }) => {
   );
 };
 
+function StepsManager({ guideId }) {
+  const [steps, setSteps] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isStepModalOpen, setStepModalOpen] = useState(false);
+  const [editingStep, setEditingStep] = useState(null);
 
-// =================================================================
-// NEW Steps Manager Component (for use inside GuideModal)
-// =================================================================
-const StepsManager = ({ guideId }) => {
-    const [steps, setSteps] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [isStepModalOpen, setStepModalOpen] = useState(false);
-    const [editingStep, setEditingStep] = useState(null);
+  const loadSteps = async () => {
+    try {
+      setLoading(true);
+      const data = await stepsAPI.getAll(guideId);
+      setSteps(data || []);
+    } catch (error) {
+      console.error(`Failed to load steps for guide ${guideId}:`, error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const loadSteps = async () => {
-        try {
-            setLoading(true);
-            const data = await stepsAPI.getAll(guideId);
-            setSteps(data || []);
-        } catch (error) {
-            console.error(`Failed to load steps for guide ${guideId}:`, error);
-        } finally {
-            setLoading(false);
-        }
-    };
+  useEffect(() => {
+    loadSteps();
+  }, [guideId]);
+  
+  const handleAddStep = () => {
+    setEditingStep(null);
+    setStepModalOpen(true);
+  };
 
-    useEffect(() => {
-        loadSteps();
-    }, [guideId]);
-    
-    const handleAddStep = () => {
-        setEditingStep(null);
-        setStepModalOpen(true);
-    };
+  const handleEditStep = (step) => {
+    setEditingStep(step);
+    setStepModalOpen(true);
+  };
 
-    const handleEditStep = (step) => {
-        setEditingStep(step);
-        setStepModalOpen(true);
-    };
-
-    const handleDeleteStep = async (stepId) => {
-        if (window.confirm("Are you sure you want to delete this step?")) {
-            try {
-                await stepsAPI.delete(stepId);
-                await loadSteps(); // Refresh the list
-            } catch (error) {
-                console.error("Failed to delete step:", error);
-                alert("Failed to delete step.");
-            }
-        }
-    };
-    
-    const onStepSaveSuccess = async () => {
-        setStepModalOpen(false);
-        setEditingStep(null);
+  const handleDeleteStep = async (stepId) => {
+    if (window.confirm("Are you sure you want to delete this step?")) {
+      try {
+        await stepsAPI.delete(stepId);
         await loadSteps(); // Refresh the list
-    };
+      } catch (error) {
+        console.error("Failed to delete step:", error);
+        alert("Failed to delete step.");
+      }
+    }
+  };
+  
+  const onStepSaveSuccess = async () => {
+    setStepModalOpen(false);
+    setEditingStep(null);
+    await loadSteps(); // Refresh the list
+  };
 
-    return (
-        <div className="steps-section">
-            <div className="steps-header">
-                <h3>Steps ({steps.length})</h3>
-                <button type="button" className="btn btn-secondary" onClick={handleAddStep}>Add Step</button>
+  return (
+    <div className="steps-section">
+      <div className="steps-header">
+        <h3>Steps ({steps.length})</h3>
+        <button type="button" className="btn btn-secondary" onClick={handleAddStep}>Add Step</button>
+      </div>
+      {loading ? <p>Loading steps...</p> : (
+        <div className="steps-list-form">
+        {steps.map((step) => (
+          <div key={step.id} className="step-item-form">
+            <div className="step-info">
+              <span className="step-number">{step.order}</span>
+              <span className="step-title">{step.title}</span>
             </div>
-            {loading ? <p>Loading steps...</p> : (
-                <div className="steps-list-form">
-                {steps.map((step) => (
-                  <div key={step.id} className="step-item-form">
-                    <div className="step-info">
-                      <span className="step-number">{step.order}</span>
-                      <span className="step-title">{step.title}</span>
-                    </div>
-                    <div className="step-actions">
-                      <button type="button" title="Edit Step" className="action-btn edit" onClick={() => handleEditStep(step)}>✏️</button>
-                      <button type="button" title="Delete Step" className="action-btn delete" onClick={() => handleDeleteStep(step.id)}>🗑️</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {isStepModalOpen && (
-                <StepModal step={editingStep} guideId={guideId} onClose={() => setStepModalOpen(false)} onSaveSuccess={onStepSaveSuccess} />
-            )}
-        </div>
-    );
-};
+            <div className="step-actions">
+              <button type="button" title="Edit Step" className="action-btn edit" onClick={() => handleEditStep(step)}>✏️</button>
+              <button type="button" title="Delete Step" className="action-btn delete" onClick={() => handleDeleteStep(step.id)}>🗑️</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      )}
+      {isStepModalOpen && (
+        <StepModal step={editingStep} guideId={guideId} onClose={() => setStepModalOpen(false)} onSaveSuccess={onStepSaveSuccess} />
+      )}
+    </div>
+  );
+}
 
-// =================================================================
-// Step Add/Edit Modal
-// =================================================================
-const StepModal = ({ step, guideId, onClose, onSaveSuccess }) => {
+function StepModal({ step, guideId, onClose, onSaveSuccess }) {
   const [formData, setFormData] = useState({
     title: step?.title || "",
     description: step?.description || "",
@@ -492,48 +549,132 @@ const StepModal = ({ step, guideId, onClose, onSaveSuccess }) => {
         <form onSubmit={handleSubmit} className="step-form">
           <div className="form-group">
             <label>Title</label>
-            <input type="text" name="title" value={formData.title} onChange={handleChange} required />
+            <input
+              type="text"
+              name="title"
+              value={formData.title}
+              onChange={handleChange}
+              className="input"
+              required
+            />
           </div>
           <div className="form-group">
             <label>Short Description</label>
-            <textarea name="description" value={formData.description} onChange={handleChange} rows="2" required />
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              className="input"
+              rows="2"
+              required
+            />
           </div>
           <div className="form-group">
             <label>Order</label>
-            <input type="number" name="order" value={formData.order} onChange={handleChange} min="1" required />
+            <input
+              type="number"
+              name="order"
+              value={formData.order}
+              onChange={handleChange}
+              className="input"
+              min="1"
+              required
+            />
           </div>
           <div className="form-group">
             <label>Image</label>
-            <input type="file" name="image" accept="image/*" onChange={handleFileChange} required={!step?.image} />
-            {step?.image && !files.image && <div className="current-file">Current: <img src={getAssetUrl(step.image)} alt="Current" /></div>}
+            <input
+              type="file"
+              name="image"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="input file-input"
+              required={!step?.image}
+            />
+            {step?.image && !files.image && (
+              <div className="current-file">
+                <span>Current:</span>
+                <img src={getAssetUrl(step.image)} alt="Current step" />
+              </div>
+            )}
           </div>
           <h3>Detailed Text Translations</h3>
           <div className="form-group">
             <label>English</label>
-            <textarea name="text.english" value={formData.text.english} onChange={handleChange} rows="3" required />
+            <textarea
+              name="text.english"
+              value={formData.text.english}
+              onChange={handleChange}
+              className="input"
+              rows="3"
+              required
+            />
           </div>
           <div className="form-group">
             <label>Amharic</label>
-            <textarea name="text.amharic" value={formData.text.amharic} onChange={handleChange} rows="3" required />
+            <textarea
+              name="text.amharic"
+              value={formData.text.amharic}
+              onChange={handleChange}
+              className="input"
+              rows="3"
+              required
+            />
           </div>
           <div className="form-group">
             <label>Oromo</label>
-            <textarea name="text.oromo" value={formData.text.oromo} onChange={handleChange} rows="3" required />
+            <textarea
+              name="text.oromo"
+              value={formData.text.oromo}
+              onChange={handleChange}
+              className="input"
+              rows="3"
+              required
+            />
           </div>
           <div className="form-group">
             <label>Duration</label>
-            <input type="text" name="duration" value={formData.duration} onChange={handleChange} placeholder="e.g., 20 minutes" required />
+            <input
+              type="text"
+              name="duration"
+              value={formData.duration}
+              onChange={handleChange}
+              className="input"
+              placeholder="e.g., 20 minutes"
+              required
+            />
           </div>
           <div className="form-group">
             <label>Audio (Optional)</label>
-            <input type="file" name="audio" accept="audio/*" onChange={handleFileChange} />
-             {step?.audio && !files.audio && <div className="current-file"><audio controls src={getAssetUrl(step.audio)} /></div>}
+            <input
+              type="file"
+              name="audio"
+              accept="audio/*"
+              onChange={handleFileChange}
+              className="input file-input"
+            />
+            {step?.audio && !files.audio && (
+              <div className="current-file">
+                <audio controls src={getAssetUrl(step.audio)} />
+              </div>
+            )}
           </div>
-           <div className="form-group">
+          <div className="form-group">
             <label>Video (Optional)</label>
-            <input type="file" name="video" accept="video/*" onChange={handleFileChange} />
-             {step?.video && !files.video && <div className="current-file"><video controls src={getAssetUrl(step.video)} /></div>}
+            <input
+              type="file"
+              name="video"
+              accept="video/*"
+              onChange={handleFileChange}
+              className="input file-input"
+            />
+            {step?.video && !files.video && (
+              <div className="current-file">
+                <video controls src={getAssetUrl(step.video)} />
+              </div>
+            )}
           </div>
+
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>

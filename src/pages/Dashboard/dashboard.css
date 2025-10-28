@@ -396,3 +396,66 @@
     padding: 16px;
   }
 }
+
+@media (max-width: 600px) {
+  .dashboard-header {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .stat-card {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .dashboard-content {
+    gap: 20px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .quick-actions {
+    gap: 10px;
+  }
+
+  .action-btn {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 0;
+  }
+
+  .dashboard-header {
+    gap: 12px;
+  }
+
+  .stats-grid {
+    gap: 12px;
+  }
+
+  .stat-card {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .action-btn {
+    padding: 14px;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .weather-info {
+    gap: 12px;
+  }
+}

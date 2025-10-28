@@ -298,7 +298,7 @@ const UsersView = ({ users, onEdit, onDelete }) => {
         <tbody>
           {users.map((user) => (
             <tr key={user.id}>
-              <td>
+              <td data-label="Name">
                 <div className="user-info">
                   <div className="user-avatar">{user.name.charAt(0)}</div>
                   <div>
@@ -307,16 +307,16 @@ const UsersView = ({ users, onEdit, onDelete }) => {
                   </div>
                 </div>
               </td>
-              <td>
+              <td data-label="Role">
                 <span className={`role-badge ${user.role}`}>{user.role}</span>
               </td>
-              <td>{user.groupName}</td>
-              <td>
+              <td data-label="Group">{user.groupName}</td>
+              <td data-label="Location">
                 <div className="location-info">
                   <span className="location-address">{user.location?.address || "N/A"}</span>
                 </div>
               </td>
-              <td>
+              <td data-label="Password">
                 {user.password ? (
                   <>
                     <span className="user-password">{user.password}</span>
@@ -331,8 +331,8 @@ const UsersView = ({ users, onEdit, onDelete }) => {
                   </>
                 ) : "-"}
               </td>
-              <td>{user.lastSeen ? new Date(user.lastSeen).toLocaleString() : "N/A"}</td>
-              <td>
+              <td data-label="Last Seen">{user.lastSeen ? new Date(user.lastSeen).toLocaleString() : "N/A"}</td>
+              <td data-label="Actions">
                 <div className="table-actions">
                   <button className="action-btn edit" onClick={() => onEdit(user)}>
                     ✏️

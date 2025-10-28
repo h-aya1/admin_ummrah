@@ -49,27 +49,28 @@ const Topbar = () => {
   }
 
   return (
-    <div className="topbar">
+    <header className="topbar">
       <div className="topbar-left">
-        <h1 className="page-title">Admin Dashboard</h1>
-        <div className="breadcrumb">
-          <span>Home</span>
-          <span className="separator">/</span>
-          <span>{currentPage}</span>
+        {isMobile && (
+          <button className="mobile-menu-btn" onClick={handleMobileMenuToggle} aria-label="Toggle navigation">
+            ☰
+          </button>
+        )}
+        <div className="page-info">
+          <h1 className="page-title">Admin Dashboard</h1>
+          <div className="breadcrumb" aria-label="Breadcrumb">
+            <span>Home</span>
+            <span className="separator">/</span>
+            <span>{currentPage}</span>
+          </div>
         </div>
       </div>
-
-      {isMobile && (
-        <button className="mobile-menu-btn" onClick={handleMobileMenuToggle}>
-          ☰
-        </button>
-      )}
 
       <div className="topbar-actions">
         <ThemeToggle />
 
         <div className="profile-wrapper" ref={profileRef}>
-          <button className="profile-btn" onClick={() => setShowProfile(!showProfile)}>
+          <button className="profile-btn" onClick={() => setShowProfile(!showProfile)} aria-haspopup="menu" aria-expanded={showProfile}>
             <div className="profile-avatar">
               <span>{user?.name?.charAt(0) || "A"}</span>
             </div>
@@ -81,7 +82,7 @@ const Topbar = () => {
           </button>
 
           {showProfile && (
-            <div className="profile-dropdown">
+            <div className="profile-dropdown" role="menu">
               <div className="dropdown-header">
                 <div className="profile-details">
                   <div className="profile-avatar large">
@@ -104,7 +105,7 @@ const Topbar = () => {
           )}
         </div>
       </div>
-    </div>
+    </header>
   )
 }
 
