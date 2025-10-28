@@ -7,6 +7,8 @@ import { requestForToken, onMessageListener } from "../firebase"
 
 // API service with authentication
 const API_BASE_URL = 'http://69.62.109.18:3001';
+// const API_BASE_URL = 'http://localhost:3000';
+
 console.log('Using API base URL:', API_BASE_URL);
 
 const generateRandomPassword = (length = 10) => {

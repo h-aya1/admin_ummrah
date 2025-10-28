@@ -310,15 +310,21 @@ export const stepsAPI = {
     return apiCall(`/guides/steps/${id}`);
   },
   async create(formData) {
-    return apiCall('/guides/steps', {
+    return apiCallWithFiles('/guides/steps', {
       method: 'POST',
       body: formData,
     });
   },
   async update(id, formData) {
-    return apiCall(`/guides/steps/${id}`, {
+    return apiCallWithFiles(`/guides/steps/${id}`, {
       method: 'PUT',
       body: formData,
+    });
+  },
+  async updateJson(id, payload) {
+    return apiCall(`/guides/steps/${id}/json`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
     });
   },
   async delete(id) {

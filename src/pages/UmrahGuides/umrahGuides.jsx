@@ -2,6 +2,16 @@ import { useState, useEffect, useRef } from "react";
 import "./umrahGuides.css";
 import { guidesAPI, stepsAPI, getAssetUrl } from "../../services/api";
 
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+const generateTempId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
 // --- Reusable Loading Spinner Component ---
 const LoadingSpinner = ({ message }) => (
   <div className="guides-loading">
@@ -208,6 +218,7 @@ const GuideModal = ({ guide, onClose, onSaveSuccess }) => {
       amharic: guide?.translation?.amharic || "",
       oromo: guide?.translation?.oromo || "",
     },
+    steps: guide?.steps || [],
   });
   const [imageFile, setImageFile] = useState(null);
   const [isSubmitting, setSubmitting] = useState(false);
@@ -223,7 +234,15 @@ const GuideModal = ({ guide, onClose, onSaveSuccess }) => {
   };
 
   const handleFileChange = (e) => {
-    setImageFile(e.target.files[0] || null);
+    const file = e.target.files[0];
+
+    if (file && file.size > MAX_FILE_SIZE_BYTES) {
+      alert(`Selected image is too large. Please choose a file under ${MAX_FILE_SIZE_MB}MB.`);
+      e.target.value = "";
+      return;
+    }
+
+    setImageFile(file || null);
   };
 
   const handleSubmit = async (e) => {
@@ -243,10 +262,33 @@ const GuideModal = ({ guide, onClose, onSaveSuccess }) => {
     }
 
     try {
+      let savedGuide;
       if (guide) {
-        await guidesAPI.update(guide.id, submitData);
+        // Editing existing guide
+        savedGuide = await guidesAPI.update(guide.id, submitData);
       } else {
-        await guidesAPI.create(submitData);
+        // Creating new guide
+        if (formData.steps.length > 0) {
+          // Include steps for new guide creation
+          submitData.append('steps', JSON.stringify(formData.steps.map(step => ({
+            title: step.title,
+            description: step.description,
+            order: step.order,
+            text: step.text,
+            arabic: step.arabic,
+            duration: step.duration,
+            location: step.location,
+          }))));
+          
+          // Add step files with indexed names
+          formData.steps.forEach((step, index) => {
+            if (step._files?.image) submitData.append(`stepImages[${index}]`, step._files.image);
+            if (step._files?.audio) submitData.append(`stepAudios[${index}]`, step._files.audio);
+            if (step._files?.video) submitData.append(`stepVideos[${index}]`, step._files.video);
+          });
+        }
+        
+        savedGuide = await guidesAPI.create(submitData);
       }
       onSaveSuccess();
     } catch (error) {
@@ -362,19 +404,6 @@ const GuideModal = ({ guide, onClose, onSaveSuccess }) => {
             </div>
           </div>
 
-          {/* SIMPLIFICATION: Steps can only be added/edited after a guide is created. */}
-          {guide?.id ? (
-            <div className="guide-form-section">
-              <StepsManager guideId={guide.id} />
-            </div>
-          ) : (
-            <div className="guide-form-section info-section">
-              <div className="form-info">
-                You must create a guide before you can add steps to it.
-              </div>
-            </div>
-          )}
-
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
@@ -382,14 +411,33 @@ const GuideModal = ({ guide, onClose, onSaveSuccess }) => {
             </button>
           </div>
         </form>
+        <div className="guide-form-section">
+          {guide?.id ? (
+            <StepsManager guideId={guide.id} />
+          ) : (
+            <StepsManager
+              isLocal={true}
+              localSteps={formData.steps}
+              onLocalStepAdd={(step) => setFormData(prev => ({ ...prev, steps: [...prev.steps, step] }))}
+              onLocalStepUpdate={(updatedStep) => setFormData(prev => ({
+                ...prev,
+                steps: prev.steps.map(s => s.id === updatedStep.id ? updatedStep : s)
+              }))}
+              onLocalStepDelete={(stepId) => setFormData(prev => ({
+                ...prev,
+                steps: prev.steps.filter(s => s.id !== stepId)
+              }))}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
-function StepsManager({ guideId }) {
-  const [steps, setSteps] = useState([]);
-  const [loading, setLoading] = useState(true);
+function StepsManager({ guideId, isLocal, localSteps, onLocalStepAdd, onLocalStepUpdate, onLocalStepDelete }) {
+  const [steps, setSteps] = useState(isLocal ? localSteps || [] : []);
+  const [loading, setLoading] = useState(!isLocal);
   const [isStepModalOpen, setStepModalOpen] = useState(false);
   const [editingStep, setEditingStep] = useState(null);
 
@@ -406,8 +454,16 @@ function StepsManager({ guideId }) {
   };
 
   useEffect(() => {
-    loadSteps();
-  }, [guideId]);
+    if (!isLocal) {
+      loadSteps();
+    }
+  }, [guideId, isLocal]);
+
+  useEffect(() => {
+    if (isLocal) {
+      setSteps(localSteps || []);
+    }
+  }, [localSteps, isLocal]);
   
   const handleAddStep = () => {
     setEditingStep(null);
@@ -420,21 +476,37 @@ function StepsManager({ guideId }) {
   };
 
   const handleDeleteStep = async (stepId) => {
-    if (window.confirm("Are you sure you want to delete this step?")) {
-      try {
-        await stepsAPI.delete(stepId);
-        await loadSteps(); // Refresh the list
-      } catch (error) {
-        console.error("Failed to delete step:", error);
-        alert("Failed to delete step.");
+    if (isLocal) {
+      onLocalStepDelete(stepId);
+    } else {
+      if (window.confirm("Are you sure you want to delete this step?")) {
+        try {
+          await stepsAPI.delete(stepId);
+          await loadSteps(); // Refresh the list
+        } catch (error) {
+          console.error("Failed to delete step:", error);
+          alert("Failed to delete step.");
+        }
       }
     }
   };
   
   const onStepSaveSuccess = async () => {
+    if (!isLocal) {
+      setStepModalOpen(false);
+      setEditingStep(null);
+      await loadSteps(); // Refresh the list
+    }
+  };
+
+  const onLocalStepSave = (stepData) => {
+    if (editingStep) {
+      onLocalStepUpdate(stepData);
+    } else {
+      onLocalStepAdd(stepData);
+    }
     setStepModalOpen(false);
     setEditingStep(null);
-    await loadSteps(); // Refresh the list
   };
 
   return (
@@ -460,13 +532,19 @@ function StepsManager({ guideId }) {
       </div>
       )}
       {isStepModalOpen && (
-        <StepModal step={editingStep} guideId={guideId} onClose={() => setStepModalOpen(false)} onSaveSuccess={onStepSaveSuccess} />
+        <StepModal 
+          step={editingStep} 
+          guideId={guideId} 
+          onClose={() => setStepModalOpen(false)} 
+          onSaveSuccess={isLocal ? null : onStepSaveSuccess}
+          onLocalSave={isLocal ? onLocalStepSave : null}
+        />
       )}
     </div>
   );
 }
 
-function StepModal({ step, guideId, onClose, onSaveSuccess }) {
+function StepModal({ step, guideId, onClose, onSaveSuccess, onLocalSave }) {
   const [formData, setFormData] = useState({
     title: step?.title || "",
     description: step?.description || "",
@@ -495,47 +573,114 @@ function StepModal({ step, guideId, onClose, onSaveSuccess }) {
   
   const handleFileChange = (e) => {
     const { name, files: fileList } = e.target;
-    setFiles(prev => ({ ...prev, [name]: fileList[0] || null }));
+    const file = fileList[0];
+
+    if (file && file.size > MAX_FILE_SIZE_BYTES) {
+      alert(`Selected file is too large. Please choose a file under ${MAX_FILE_SIZE_MB}MB.`);
+      e.target.value = "";
+      return;
+    }
+
+    setFiles(prev => ({ ...prev, [name]: file || null }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!files.image && !step?.image) {
+    if (!onLocalSave && !files.image && !step?.image) {
       alert("An image is required for the step.");
       return;
     }
     setSubmitting(true);
 
-    const submitData = new FormData();
-    submitData.append('title', formData.title);
-    submitData.append('description', formData.description);
-    submitData.append('order', formData.order);
-    submitData.append('duration', formData.duration);
-    submitData.append('guideId', guideId);
-    submitData.append('arabic', formData.arabic || '');
-    submitData.append('location', formData.location || '');
+    if (onLocalSave) {
+      // Local mode: just return the data
+      const stepData = {
+        id: step?.id || generateTempId(),
+        title: formData.title,
+        description: formData.description,
+        order: formData.order,
+        text: formData.text,
+        arabic: formData.arabic || "",
+        duration: formData.duration,
+        location: formData.location || "",
+        image: files.image ? URL.createObjectURL(files.image) : step?.image || "",
+        audio: files.audio ? URL.createObjectURL(files.audio) : step?.audio || null,
+        video: files.video ? URL.createObjectURL(files.video) : step?.video || null,
+        // Store the actual files for later submission
+        _files: {
+          image: files.image,
+          audio: files.audio,
+          video: files.video
+        }
+      };
+      onLocalSave(stepData);
+    } else {
+      // API mode: submit to server
+      const hasFiles = files.image || files.audio || files.video;
 
-    // FIX: Stringify the text object for multipart/form-data
-    submitData.append('text', JSON.stringify(formData.text));
+      if (!hasFiles) {
+        // Text-only update: use JSON API to avoid payload size limits
+        const textUpdateData = {
+          title: formData.title,
+          description: formData.description,
+          order: formData.order,
+          text: formData.text,
+          arabic: formData.arabic || '',
+          duration: formData.duration,
+          location: formData.location || '',
+          guideId: guideId,
+        };
 
-    if (files.image) submitData.append('image', files.image);
-    if (files.audio) submitData.append('audio', files.audio);
-    if (files.video) submitData.append('video', files.video);
-
-    try {
-      if (step) {
-        await stepsAPI.update(step.id, submitData);
+        try {
+          if (step) {
+            await stepsAPI.updateJson(step.id, textUpdateData);
+          } else {
+            // For new steps, we still need to use FormData since files are required
+            // This shouldn't happen in text-only case since image is required
+            throw new Error("Image is required for new steps");
+          }
+          onSaveSuccess();
+        } catch (error) {
+          console.error("Failed to save step:", error.response?.data || error.message);
+          const errorMessage = error.response?.data?.message?.[0] || 'Failed to save step.';
+          alert(errorMessage);
+        } finally {
+          setSubmitting(false);
+        }
       } else {
-        await stepsAPI.create(submitData);
+        // File upload: use multipart/form-data
+        const submitData = new FormData();
+        submitData.append('title', formData.title);
+        submitData.append('description', formData.description);
+        submitData.append('order', formData.order);
+        submitData.append('duration', formData.duration);
+        submitData.append('guideId', guideId);
+        submitData.append('arabic', formData.arabic || '');
+        submitData.append('location', formData.location || '');
+
+        // FIX: Stringify the text object for multipart/form-data
+        submitData.append('text', JSON.stringify(formData.text));
+
+        if (files.image) submitData.append('image', files.image);
+        if (files.audio) submitData.append('audio', files.audio);
+        if (files.video) submitData.append('video', files.video);
+
+        try {
+          if (step) {
+            await stepsAPI.update(step.id, submitData);
+          } else {
+            await stepsAPI.create(submitData);
+          }
+          onSaveSuccess();
+        } catch (error) {
+          console.error("Failed to save step:", error.response?.data || error.message);
+          const errorMessage = error.response?.data?.message?.[0] || 'Failed to save step.';
+          alert(errorMessage);
+        } finally {
+          setSubmitting(false);
+        }
       }
-      onSaveSuccess();
-    } catch (error) {
-      console.error("Failed to save step:", error.response?.data || error.message);
-      const errorMessage = error.response?.data?.message?.[0] || 'Failed to save step.';
-      alert(errorMessage);
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -678,7 +823,7 @@ function StepModal({ step, guideId, onClose, onSaveSuccess }) {
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : (step ? 'Update Step' : 'Add Step')}
+              {isSubmitting ? 'Saving...' : onLocalSave ? (step ? 'Update Step' : 'Add Step') : (step ? 'Update Step' : 'Add Step')}
             </button>
           </div>
         </form>
