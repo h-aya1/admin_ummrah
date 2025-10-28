@@ -33,7 +33,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: dist/
           server-dir: ummrah-admin/
-          dangerous-clean-slate: false
+          dangerous-clean-slate: true
 
           exclude: |
                     **/.git*
