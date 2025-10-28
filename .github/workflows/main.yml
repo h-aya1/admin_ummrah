@@ -33,6 +33,9 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: dist/
           server-dir: ummrah-admin/
+          dangerous-clean-slate: true
+          protocol: ftps               
+          port: 21 
 
           exclude: |
                     **/.git*
