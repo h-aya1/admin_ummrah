@@ -24,6 +24,7 @@ jobs:
       - name: 🔍 List build output
         run: ls -la dist
 
+        
       - name: 📂 Deploy to cPanel via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
@@ -32,7 +33,9 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: dist/
           server-dir: ummrah-admin/
-          dangerous-clean-slate: false
+          dangerous-clean-slate: true
+          protocol: ftp              
+          port: 21 
 
           exclude: |
                     **/.git*
