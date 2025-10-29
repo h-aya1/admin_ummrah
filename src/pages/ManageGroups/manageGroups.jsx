@@ -109,13 +109,13 @@ const ManageGroups = () => {
         <h1>Manage Groups & Users</h1>
         <div className="header-actions">
           <div className="tab-buttons">
-            <button 
+            <button
               className={`tab-btn ${activeTab === "groups" ? "active" : ""}`}
               onClick={() => setActiveTab("groups")}
             >
               Groups
             </button>
-            <button 
+            <button
               className={`tab-btn ${activeTab === "users" ? "active" : ""}`}
               onClick={() => setActiveTab("users")}
             >
@@ -130,16 +130,17 @@ const ManageGroups = () => {
 
       <div className="page-content">
         {activeTab === "groups" ? (
-          <GroupsView 
-            groups={groups} 
-            onEdit={handleEditItem} 
+          <GroupsView
+            groups={groups}
+            users={users}
+            onEdit={handleEditItem}
             onDelete={(id) => handleDeleteItem(id, "group")}
             onView={setSelectedGroup}
           />
         ) : (
-          <UsersView 
-            users={users} 
-            onEdit={handleEditItem} 
+          <UsersView
+            users={users}
+            onEdit={handleEditItem}
             onDelete={(id) => handleDeleteItem(id, "user")}
           />
         )}
@@ -213,7 +214,13 @@ const ManageGroups = () => {
   )
 }
 
-const GroupsView = ({ groups, onEdit, onDelete, onView }) => {
+const GroupsView = ({ groups, users, onEdit, onDelete, onView }) => {
+  const getAmirName = (amirId) => {
+    if (!amirId || !users) return "N/A";
+    const amirUser = users.find(u => u.id === amirId);
+    return amirUser ? amirUser.name : "N/A";
+  };
+
   return (
     <div className="groups-grid">
       {groups.map((group) => (
@@ -221,7 +228,7 @@ const GroupsView = ({ groups, onEdit, onDelete, onView }) => {
           <div className="group-header">
             <div className="group-info">
               <h3 className="group-name">{group.name}</h3>
-              <p className="group-amir">Amir: {group.amir}</p>
+              <p className="group-amir">Amir: {getAmirName(group.amir)}</p>
             </div>
             <div className="group-actions">
               <button className="action-btn view" onClick={() => onView(group)}>
@@ -259,7 +266,7 @@ const GroupsView = ({ groups, onEdit, onDelete, onView }) => {
           </div>
 
           <div className="group-footer">
-            <span className="created-date">Created: {group.createdAt || "N/A"}</span>
+            <span className="created-date">Created: {group.createdAt ? new Date(group.createdAt).toLocaleDateString() : "N/A"}</span>
           </div>
         </div>
       ))}
@@ -268,18 +275,13 @@ const GroupsView = ({ groups, onEdit, onDelete, onView }) => {
 }
 
 const UsersView = ({ users, onEdit, onDelete }) => {
-  // Copy password to clipboard
   const handleCopyPassword = (password) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(password)
-        .then(() => {
-          alert("Password copied to clipboard!")
-        })
-        .catch(() => {
-          alert("Failed to copy password.")
-        })
+        .then(() => alert("Password copied to clipboard!"))
+        .catch(() => alert("Failed to copy password."));
     }
-  }
+  };
 
   return (
     <div className="users-table-container">
@@ -310,7 +312,7 @@ const UsersView = ({ users, onEdit, onDelete }) => {
               <td data-label="Role">
                 <span className={`role-badge ${user.role}`}>{user.role}</span>
               </td>
-              <td data-label="Group">{user.groupName}</td>
+              <td data-label="Group">{user.groupName || "N/A"}</td>
               <td data-label="Location">
                 <div className="location-info">
                   <span className="location-address">{user.location?.address || "N/A"}</span>
@@ -350,10 +352,8 @@ const UsersView = ({ users, onEdit, onDelete }) => {
   )
 }
 
-// AddMemberSection component
 const AddMemberSection = ({ group, users, onAssignUser }) => {
   const members = Array.isArray(group?.members) ? group.members : []
-  // Filter out users who are already members (including the amir who is auto-added)
   const available = users.filter((u) => (
     u.role !== 'admin' && !members.some((m) => String(m.id) === String(u.id))
   ))
@@ -362,7 +362,6 @@ const AddMemberSection = ({ group, users, onAssignUser }) => {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    // when users or group changes, update the selected user id
     if (available.length > 0 && !selectedUserId) {
       setSelectedUserId(String(available[0].id))
     }
@@ -377,8 +376,7 @@ const AddMemberSection = ({ group, users, onAssignUser }) => {
       return
     }
 
-    const uid = selectedUserId
-    const user = users.find((u) => String(u.id) === String(uid))
+    const user = users.find((u) => String(u.id) === selectedUserId)
     if (!user) {
       setToastMsg('Selected user not found. Please refresh and try again.')
       return
@@ -401,9 +399,9 @@ const AddMemberSection = ({ group, users, onAssignUser }) => {
         <div className="no-users-message">No available users to add</div>
       ) : (
         <div className="add-member-form">
-          <select 
-            className="member-select" 
-            value={selectedUserId} 
+          <select
+            className="member-select"
+            value={selectedUserId}
             onChange={(e) => setSelectedUserId(e.target.value)}
           >
             <option value="">Select a user...</option>
@@ -424,7 +422,7 @@ const AddMemberSection = ({ group, users, onAssignUser }) => {
 const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignUser, onRemoveUser }) => {
   const members = Array.isArray(group?.members) ? group.members.map(member => {
     const user = users.find(u => u.id === member.id);
-    return user ? { ...member, name: user.name } : member;
+    return user ? { ...member, name: user.name, role: user.role } : member;
   }) : [];
   const totalMembers = members.length
   const lastActivity = group?.lastActivity ? new Date(group.lastActivity).toLocaleString() : "N/A"
@@ -432,7 +430,12 @@ const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignU
   const offlineMembers = Math.max(0, totalMembers - activeMembers)
   const modalRef = useRef(null)
 
-  // Close modal when clicking outside
+  const getAmirName = (amirId) => {
+    if (!amirId || !users) return "-";
+    const amirUser = users.find(u => u.id === amirId);
+    return amirUser ? amirUser.name : "-";
+  };
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (modalRef.current && event.target === modalRef.current) {
@@ -446,7 +449,6 @@ const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignU
     }
   }, [onClose])
 
-  // Remove member handler (backend)
   const handleRemoveMember = async (memberId) => {
     if (typeof onRemoveUser === 'function') {
       await onRemoveUser(memberId, group.id)
@@ -480,13 +482,13 @@ const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignU
             </div>
             <div className="group-info-detail">
               <div className="info-item">
-                <strong>Amir:</strong> {group?.amir || "-"}
+                <strong>Amir:</strong> {getAmirName(group?.amir)}
               </div>
               <div className="info-item">
                 <strong>Current Location:</strong> {group?.location || "-"}
               </div>
               <div className="info-item">
-                <strong>Created:</strong> {group?.createdAt || "-"}
+                <strong>Created:</strong> {group?.createdAt ? new Date(group.createdAt).toLocaleDateString() : "-"}
               </div>
               <div className="info-item">
                 <strong>Last Activity:</strong> {lastActivity}
@@ -506,7 +508,7 @@ const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignU
                         <span className={`role-badge ${member.role}`}>{member.role}</span>
                       </div>
                     </div>
-                    <div className="member-joined">Joined: {member.joinedAt || "-"}</div>
+                    <div className="member-joined">Joined: {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : "-"}</div>
                   </div>
                   <button
                     className="btn btn-danger"
@@ -519,7 +521,6 @@ const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignU
                 </div>
               ))}
             </div>
-            {/* Add member form */}
             <AddMemberSection group={group} users={users} onAssignUser={onAssignUser} />
           </div>
         </div>
@@ -530,26 +531,31 @@ const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignU
 
 
 const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
-  // Ensure users is always defined
-  users = users || []
   const modalRef = useRef(null)
-  const [formData, setFormData] = useState(
-    type === "group"
-      ? {
-          name: item?.name || "",
-          amir: item?.amir || "",
-        }
-      : {
-          name: item?.name || "",
-          phone: item?.phone || "",
-          email: item?.email || "",
-          role: item?.role || "pilgrim",
-          emergencyContact: item?.emergencyContact || "",
-          groupId: item?.groupId || "",
-        },
-  )
-  // Only users with role 'amir' for group leader selection
-  const amirUsers = users.filter(u => u.role === "amir")
+  const [formData, setFormData] = useState({})
+
+  // Filter for users who can be an Amir
+  const amirUsers = users.filter(u => u.role === "amir");
+
+  // Initialize form data based on type and item
+  useEffect(() => {
+    if (type === "group") {
+      setFormData({
+        name: item?.name || "",
+        amir: item?.amir || "", // This should be the amir's user ID (UUID)
+        location: item?.location || "",
+      });
+    } else {
+      setFormData({
+        name: item?.name || "",
+        phone: item?.phone || "",
+        email: item?.email || "",
+        role: item?.role || "pilgrim",
+        emergencyContact: item?.emergencyContact || "",
+        groupId: item?.groupId || "",
+      });
+    }
+  }, [item, type]);
 
   // Close modal when clicking outside
   useEffect(() => {
@@ -558,7 +564,6 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
         onClose()
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside)
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
@@ -573,30 +578,21 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     const dataToSend = { ...formData };
-    delete dataToSend.groupName; // Ensure groupName is not sent
 
     if (type === "user") {
       if (!dataToSend.phone) {
         alert("Phone number is required.");
         return;
       }
-      if (dataToSend.role === 'amir' && !dataToSend.groupId) {
-        alert('An Amir must be assigned to a group.');
-        return;
-      }
     }
-    if (type === "group") {
-      // Amir must be selected from users list
-      if (!formData.amir) {
-        alert("Please select an Amir (Group Leader) from the users list.")
-        return
+
+    // Clean up data: send null or undefined for empty optional fields instead of ""
+    Object.keys(dataToSend).forEach(key => {
+      if (dataToSend[key] === '') {
+        delete dataToSend[key]; // Or set to null, depending on backend preference
       }
-      const amirExists = users.some((u) => u.name === formData.amir)
-      if (!amirExists) {
-        alert("Selected Amir is not in the users list.")
-        return
-      }
-    }
+    });
+
     onSave(dataToSend);
   }
 
@@ -620,7 +616,7 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
                 <input
                   type="text"
                   name="name"
-                  value={formData.name}
+                  value={formData.name || ""}
                   onChange={handleChange}
                   className="input"
                   required
@@ -631,21 +627,31 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
                 <label>Amir (Group Leader)</label>
                 <select
                   name="amir"
-                  value={formData.amir}
+                  value={formData.amir || ""}
                   onChange={handleChange}
                   className="input"
-                  required
+                  // REMOVED: required attribute to make it optional
                 >
-                  <option value="">Select Amir from users...</option>
+                  <option value="">Select Amir from users... (Optional)</option>
                   {amirUsers.map((u) => (
-                    <option key={u.id} value={u.name}>{u.name}</option>
+                    <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>
                 {amirUsers.length === 0 && (
                   <small style={{ color: "#888" }}>
-                    No users with role 'Amir' available. Please add an Amir user first.
+                    No users with role 'Amir' available.
                   </small>
                 )}
+              </div>
+              <div className="form-group">
+                <label>Location</label>
+                <input
+                  type="text"
+                  name="location"
+                  value={formData.location || ""}
+                  onChange={handleChange}
+                  className="input"
+                />
               </div>
             </>
           ) : (
@@ -655,7 +661,7 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
                 <input
                   type="text"
                   name="name"
-                  value={formData.name}
+                  value={formData.name || ""}
                   onChange={handleChange}
                   className="input"
                   required
@@ -668,18 +674,17 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
                   <input
                     type="email"
                     name="email"
-                    value={formData.email}
+                    value={formData.email || ""}
                     onChange={handleChange}
                     className="input"
                   />
                 </div>
-
                 <div className="form-group">
-                  <label>Phone <span style={{color: 'red'}}>*</span></label>
+                  <label>Phone <span style={{ color: 'red' }}>*</span></label>
                   <input
                     type="tel"
                     name="phone"
-                    value={formData.phone}
+                    value={formData.phone || ""}
                     onChange={handleChange}
                     className="input"
                     required
@@ -689,30 +694,18 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
 
               <div className="form-group">
                 <label>Role</label>
-                <select name="role" value={formData.role} onChange={handleChange} className="input">
+                <select name="role" value={formData.role || "pilgrim"} onChange={handleChange} className="input">
                   <option value="pilgrim">Pilgrim</option>
                   <option value="amir">Amir</option>
                 </select>
               </div>
-
-              {formData.role === 'amir' && (
-                <div className="form-group">
-                  <label>Group <span style={{color: 'red'}}>*</span></label>
-                  <select name="groupId" value={formData.groupId} onChange={handleChange} className="input" required>
-                    <option value="">Select a group...</option>
-                    {groups.map((group) => (
-                      <option key={group.id} value={group.id}>{group.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               <div className="form-group">
                 <label>Emergency Contact</label>
                 <input
                   type="tel"
                   name="emergencyContact"
-                  value={formData.emergencyContact}
+                  value={formData.emergencyContact || ""}
                   onChange={handleChange}
                   className="input"
                 />
@@ -720,31 +713,21 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
 
               <div className="form-group">
                 <label>Group</label>
-                {item?.groupName ? (
-                  <input
-                    type="text"
-                    value={item.groupName}
-                    className="input"
-                    disabled
-                  />
-                ) : (
-                  <select
-                    name="groupId"
-                    value={formData.groupId}
-                    onChange={handleChange}
-                    className="input"
-                  >
-                    <option value="">Select a group...</option>
-                    {groups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <select
+                  name="groupId"
+                  value={formData.groupId || ""}
+                  onChange={handleChange}
+                  className="input"
+                  // REMOVED: required attribute to make it optional for all roles
+                >
+                  <option value="">Select a group... (Optional)</option>
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-
-              
             </>
           )}
 
@@ -762,4 +745,4 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
   )
 }
 
-export default ManageGroups
+export default ManageGroups;

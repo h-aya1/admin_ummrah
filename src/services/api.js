@@ -1,10 +1,7 @@
 // API service with authentication
 export const UNAUTHORIZED_EVENT = 'app:unauthorized';
 
-export const API_BASE_URL =
-  window.location.hostname === 'localhost'
-    ? 'http://69.62.109.18:3001'
-    : 'http://localhost:3000';
+export const API_BASE_URL = 'https://hanim-tour.skylinkict.com';
 console.log('Using API base URL:', API_BASE_URL);
 
 export const getAssetUrl = (path) => {
@@ -161,25 +158,25 @@ export const usersAPI = {
 // Groups API
 export const groupsAPI = {
   async getAll() {
-    return apiCall('/admin/groups'); // GET all groups (admin route)
+    return apiCall('/groups'); // GET all groups (admin route)
   },
 
   async create(payload) {
-    return apiCall('/admin/groups', {
+    return apiCall('/groups', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
   },
 
   async update(id, payload) {
-    return apiCall(`/admin/groups/${id}`, {
+    return apiCall(`/groups/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
   },
 
   async delete(id) {
-    return apiCall(`/admin/groups/${id}`, {
+    return apiCall(`groups/${id}`, {
       method: 'DELETE',
     });
   },

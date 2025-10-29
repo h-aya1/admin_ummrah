@@ -5,8 +5,8 @@ import { MessageItem } from '../../components/chat/MessageItem';
 import './chat.css';
 
 // --- Configuration ---
-const API_BASE_URL = 'http://69.62.109.18:3001';
-const SOCKET_URL = 'http://69.62.109.18:3001/chat';
+const API_BASE_URL = 'https://hanim-tour.skylinkict.com';
+const SOCKET_URL = 'https://hanim-tour.skylinkict.com/chat';
 
 // --- Helper Components ---
 const AttachmentIcon = () => (

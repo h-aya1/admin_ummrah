@@ -11,7 +11,7 @@ import 'leaflet/dist/leaflet.css';
 import './liveMap.css';
 
 // --- CONFIGURATION ---
-const API_BASE_URL = 'http://69.62.109.18:3001';
+const API_BASE_URL = 'https://hanim-tour.skylinkict.com';
 
 // --- ASSET IMPORTS ---
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
