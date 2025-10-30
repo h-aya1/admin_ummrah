@@ -215,12 +215,6 @@ const ManageGroups = () => {
 }
 
 const GroupsView = ({ groups, users, onEdit, onDelete, onView }) => {
-  const getAmirName = (amirId) => {
-    if (!amirId || !users) return "N/A";
-    const amirUser = users.find(u => u.id === amirId);
-    return amirUser ? amirUser.name : "N/A";
-  };
-
   return (
     <div className="groups-grid">
       {groups.map((group) => (
@@ -228,7 +222,8 @@ const GroupsView = ({ groups, users, onEdit, onDelete, onView }) => {
           <div className="group-header">
             <div className="group-info">
               <h3 className="group-name">{group.name}</h3>
-              <p className="group-amir">Amir: {getAmirName(group.amir)}</p>
+              {/* FIX: Display the amir name directly from the group object */}
+              <p className="group-amir">Amir: {group.amir || "N/A"}</p>
             </div>
             <div className="group-actions">
               <button className="action-btn view" onClick={() => onView(group)}>
@@ -422,19 +417,24 @@ const AddMemberSection = ({ group, users, onAssignUser }) => {
 const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignUser, onRemoveUser }) => {
   const members = Array.isArray(group?.members) ? group.members.map(member => {
     const user = users.find(u => u.id === member.id);
-    return user ? { ...member, name: user.name, role: user.role } : member;
+    
+    if (user) {
+      return { ...member, name: user.name, role: user.role };
+    }
+    
+    const isAmir = group.amir === member.id;
+    return {
+      ...member,
+      name: isAmir ? 'Group Amir (User not found)' : 'Unknown Member (User not found)',
+      role: isAmir ? 'amir' : 'unknown',
+    };
   }) : [];
+
   const totalMembers = members.length
   const lastActivity = group?.lastActivity ? new Date(group.lastActivity).toLocaleString() : "N/A"
   const activeMembers = typeof group?.activeMembers === 'number' ? group.activeMembers : 0
   const offlineMembers = Math.max(0, totalMembers - activeMembers)
   const modalRef = useRef(null)
-
-  const getAmirName = (amirId) => {
-    if (!amirId || !users) return "-";
-    const amirUser = users.find(u => u.id === amirId);
-    return amirUser ? amirUser.name : "-";
-  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -482,7 +482,8 @@ const GroupDetailModal = ({ group, onClose, users = [], onUpdateGroup, onAssignU
             </div>
             <div className="group-info-detail">
               <div className="info-item">
-                <strong>Amir:</strong> {getAmirName(group?.amir)}
+                {/* FIX: Display the amir name directly from the group object */}
+                <strong>Amir:</strong> {group?.amir || "-"}
               </div>
               <div className="info-item">
                 <strong>Current Location:</strong> {group?.location || "-"}
@@ -542,7 +543,7 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
     if (type === "group") {
       setFormData({
         name: item?.name || "",
-        amir: item?.amir || "", // This should be the amir's user ID (UUID)
+        amir: item?.amir || "",
         location: item?.location || "",
       });
     } else {
@@ -589,7 +590,7 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
     // Clean up data: send null or undefined for empty optional fields instead of ""
     Object.keys(dataToSend).forEach(key => {
       if (dataToSend[key] === '') {
-        delete dataToSend[key]; // Or set to null, depending on backend preference
+        delete dataToSend[key];
       }
     });
 
@@ -630,11 +631,13 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
                   value={formData.amir || ""}
                   onChange={handleChange}
                   className="input"
-                  // REMOVED: required attribute to make it optional
                 >
                   <option value="">Select Amir from users... (Optional)</option>
                   {amirUsers.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
+                    // ===================================================================
+                    // --- FIX: Send the user's NAME, not their ID, to match backend ---
+                    // ===================================================================
+                    <option key={u.id} value={u.name}>{u.name}</option>
                   ))}
                 </select>
                 {amirUsers.length === 0 && (
@@ -718,7 +721,6 @@ const ItemModal = ({ type, item, groups, users = [], onClose, onSave }) => {
                   value={formData.groupId || ""}
                   onChange={handleChange}
                   className="input"
-                  // REMOVED: required attribute to make it optional for all roles
                 >
                   <option value="">Select a group... (Optional)</option>
                   {groups.map((group) => (

@@ -176,7 +176,7 @@ export const groupsAPI = {
   },
 
   async delete(id) {
-    return apiCall(`groups/${id}`, {
+    return apiCall(`/groups/${id}`, {
       method: 'DELETE',
     });
   },
